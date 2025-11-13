@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as XLSX from "xlsx";
-import * as fs from "fs";
-import * as path from "path";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,51 +9,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid name" }, { status: 400 });
     }
 
-    const uploadsDir = path.join(process.cwd(), "uploads");
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      console.error("Supabase env vars missing");
+      return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
     }
 
-    const filePath = path.join(uploadsDir, "user_names.xlsx");
-    let wb: XLSX.WorkBook;
-    let ws: XLSX.WorkSheet;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: false },
+    });
 
-    // Check if file exists
-    if (fs.existsSync(filePath)) {
-      // Read existing file
-      const fileBuffer = fs.readFileSync(filePath);
-      wb = XLSX.read(fileBuffer, { type: "buffer" });
-      ws = wb.Sheets[wb.SheetNames[0]];
-    } else {
-      // Create new workbook with headers
-      wb = XLSX.utils.book_new();
-      ws = XLSX.utils.aoa_to_sheet([["Name", "Timestamp"]]);
-      XLSX.utils.book_append_sheet(wb, ws, "Users");
+    // Table name: `user_names` (create this table in Supabase before deploying)
+    const table = "user_names";
+    const timestamp = new Date().toISOString();
+
+    const { data, error } = await supabase.from(table).insert([{ name, timestamp }]);
+
+    if (error) {
+      console.error("Supabase insert error:", error);
+      return NextResponse.json({ error: "Failed to save name to DB" }, { status: 500 });
     }
 
-    // Get existing data
-    const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-
-    // Add new name with timestamp
-    const timestamp = new Date().toLocaleString();
-    data.push([name, timestamp]);
-
-    // Update sheet
-    const newWs = XLSX.utils.aoa_to_sheet(data);
-    wb.Sheets[wb.SheetNames[0]] = newWs;
-
-    // Write file
-    XLSX.writeFile(wb, filePath);
-
-    return NextResponse.json(
-      { message: "Name saved successfully" },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("Error saving name:", error);
-    return NextResponse.json(
-      { error: "Failed to save name" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Name saved successfully", data }, { status: 200 });
+  } catch (err) {
+    console.error("Error saving name:", err);
+    return NextResponse.json({ error: "Failed to save name" }, { status: 500 });
   }
 }
