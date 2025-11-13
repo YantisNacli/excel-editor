@@ -35,3 +35,18 @@ create table public.user_names (
 
 Security note: Do not expose service role keys in client-side code. Keep them as server environment variables.
 
+## Storage for edited files
+
+The app includes a server route `/api/save` that uploads edited Excel files to a Supabase Storage bucket named `uploads`.
+
+1. In your Supabase project, go to the Storage section and create a bucket called `uploads`.
+2. (Optional) Make the bucket public if you want files to be directly accessible via URL; otherwise generate signed URLs when needed.
+3. The `/api/save` route expects JSON with `filename` and `base64` (base64 XLSX content). It uploads the file and returns a public URL when available.
+
+Example client payload sent by the app:
+
+```json
+{ "filename": "myfile-edited.xlsx", "base64": "...base64 data..." }
+```
+
+
