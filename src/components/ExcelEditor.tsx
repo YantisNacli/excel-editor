@@ -135,13 +135,14 @@ export default function ExcelEditor() {
 
     setIsSavingName(true);
     try {
-      // Prepare the current Excel data
-      const currentExcelData = activeFile !== null
-        ? [
-            columns.map((c) => c.name),
-            ...rows.map((r) => columns.map((c) => r[c.key] ?? "")),
-          ]
-        : null;
+      // Prepare the current Excel data only if a file is active
+      let currentExcelData = null;
+      if (activeFile !== null) {
+        currentExcelData = [
+          columns.map((c) => c.name),
+          ...rows.map((r) => columns.map((c) => r[c.key] ?? "")),
+        ];
+      }
 
       const res = await fetch("/api/saveName", {
         method: "POST",
