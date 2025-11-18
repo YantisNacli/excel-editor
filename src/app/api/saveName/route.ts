@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import * as XLSX from "xlsx";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name } = await req.json();
+    const { name, excelData } = await req.json();
 
     if (!name || typeof name !== "string") {
       return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+    }
+
+    if (!excelData || typeof excelData !== "object") {
+      return NextResponse.json({ error: "Invalid Excel data" }, { status: 400 });
     }
 
     const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
@@ -26,19 +31,47 @@ export async function POST(req: NextRequest) {
       auth: { persistSession: false },
     });
 
-    const timestamp = new Date().toISOString();
+    // Fetch the existing Excel file from Supabase
+    const { data: fileData, error: fetchError } = await supabase
+      .storage
+      .from("uploads")
+      .download("user_data.xlsx");
 
-    const { data, error } = await supabase.from("user_names").insert([{ name, timestamp }]);
-
-    if (error) {
-      console.error("Supabase insert error:", error);
-      return NextResponse.json({ error: `Supabase error: ${error.message}` }, { status: 500 });
+    if (fetchError) {
+      console.error("Error fetching Excel file:", fetchError);
+      return NextResponse.json({ error: "Failed to fetch Excel file" }, { status: 500 });
     }
 
-    return NextResponse.json({ message: "Name saved successfully", data }, { status: 200 });
+    // Parse the Excel file
+    const fileBuffer = await fileData.arrayBuffer();
+    const workbook = XLSX.read(fileBuffer, { type: "array" });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    // Add the new name to the Excel data
+    sheetData.push([name, new Date().toISOString()]);
+
+    // Convert back to Excel format
+    const updatedWorksheet = XLSX.utils.aoa_to_sheet(sheetData);
+    workbook.Sheets[sheetName] = updatedWorksheet;
+    const updatedExcel = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+
+    // Upload the updated Excel file back to Supabase
+    const { error: uploadError } = await supabase
+      .storage
+      .from("uploads")
+      .upload("user_data.xlsx", updatedExcel, { upsert: true });
+
+    if (uploadError) {
+      console.error("Error uploading updated Excel file:", uploadError);
+      return NextResponse.json({ error: "Failed to upload updated Excel file" }, { status: 500 });
+    }
+
+    return NextResponse.json({ message: "Name and Excel file updated successfully" }, { status: 200 });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error("Error saving name:", errorMsg);
+    console.error("Error saving name and updating Excel file:", errorMsg);
     return NextResponse.json({ error: `Server error: ${errorMsg}` }, { status: 500 });
   }
 }

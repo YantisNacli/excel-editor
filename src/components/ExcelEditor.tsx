@@ -132,15 +132,23 @@ export default function ExcelEditor() {
 
   const handleSubmitName = async () => {
     if (!userName.trim()) return;
-    
+
     setIsSavingName(true);
     try {
+      // Prepare the current Excel data
+      const currentExcelData = activeFile !== null
+        ? [
+            columns.map((c) => c.name),
+            ...rows.map((r) => columns.map((c) => r[c.key] ?? "")),
+          ]
+        : null;
+
       const res = await fetch("/api/saveName", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: userName }),
+        body: JSON.stringify({ name: userName, excelData: currentExcelData }),
       });
-      
+
       if (res.ok) {
         setIsNameSubmitted(true);
       } else {
