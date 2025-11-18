@@ -6,11 +6,15 @@ export async function POST(req: NextRequest) {
   try {
     const { name, excelData } = await req.json();
 
+    console.log("Received payload:", { name, excelData });
+
     if (!name || typeof name !== "string") {
+      console.error("Invalid name received:", name);
       return NextResponse.json({ error: "Invalid name" }, { status: 400 });
     }
 
-    if (!excelData || typeof excelData !== "object") {
+    if (!excelData || !Array.isArray(excelData)) {
+      console.error("Invalid Excel data received:", excelData);
       return NextResponse.json({ error: "Invalid Excel data" }, { status: 400 });
     }
 
