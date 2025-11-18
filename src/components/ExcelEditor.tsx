@@ -2,8 +2,7 @@
 
 import React, { useState } from "react";
 import * as XLSX from "xlsx";
--import DataGrid, { Column } from "react-data-grid";
-+import { DataGrid, type Column } from "react-data-grid";
+import { DataGrid, type Column } from "react-data-grid";
 
 type Row = { id: number; [key: string]: any };
 
