@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     if (fetchError) {
       console.error("Error fetching Excel file:", fetchError);
-      return NextResponse.json({ error: "Failed to fetch Excel file" }, { status: 500 });
+      return NextResponse.json({ error: `Failed to fetch Excel file: ${fetchError.message}` }, { status: 500 });
     }
 
     // Parse the Excel file
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 
     if (uploadError) {
       console.error("Error uploading updated Excel file:", uploadError);
-      return NextResponse.json({ error: "Failed to upload updated Excel file" }, { status: 500 });
+      return NextResponse.json({ error: `Failed to upload updated Excel file: ${uploadError.message}` }, { status: 500 });
     }
 
     return NextResponse.json({ message: "Name saved to Excel file successfully" }, { status: 200 });
