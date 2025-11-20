@@ -229,7 +229,7 @@ export default function ExcelEditor() {
       <div className="p-4">
         <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
           <h2 className="text-xl font-bold mb-4">Part Number</h2>
-          <p className="mb-4 text-sm text-gray-600">
+          <p className="mb-4 text-sm text-gray-900">
             Welcome, <span className="font-semibold">{userName}</span>!
           </p>
           <label className="block mb-2 font-semibold">What part number do you want to take out?</label>
@@ -261,7 +261,7 @@ export default function ExcelEditor() {
 
   return (
     <div className="p-4">
-      <div className="mb-4 text-sm text-gray-600">
+      <div className="mb-4 text-sm text-gray-900">
         Welcome, <span className="font-semibold">{userName}</span>! Part Number: <span className="font-semibold">{partNumber}</span>
       </div>
       <div className="mb-4">

@@ -89,17 +89,17 @@ export default function ViewPage() {
               <tbody>
                 {data.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-2 text-center text-gray-500">
+                    <td colSpan={5} className="px-4 py-2 text-center text-gray-700">
                       No data yet
                     </td>
                   </tr>
                 ) : (
                   data.map((row, idx) => (
                     <tr key={idx} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 border-b">{row.date}</td>
-                      <td className="px-4 py-2 border-b">{row.name}</td>
-                      <td className="px-4 py-2 border-b">{row.partNumber}</td>
-                      <td className="px-4 py-2 border-b">{row.quantity}</td>
+                      <td className="px-4 py-2 border-b text-gray-900">{row.date}</td>
+                      <td className="px-4 py-2 border-b text-gray-900">{row.name}</td>
+                      <td className="px-4 py-2 border-b text-gray-900">{row.partNumber}</td>
+                      <td className="px-4 py-2 border-b text-gray-900">{row.quantity}</td>
                       <td className="px-4 py-2 border-b">
                         <button
                           onClick={() => handleDelete(idx)}
