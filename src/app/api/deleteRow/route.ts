@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import * as XLSX from "xlsx";
 
 export async function POST(req: NextRequest) {
   try {
-    const { rowIndex } = await req.json();
+    const { rowId } = await req.json();
 
-    if (typeof rowIndex !== "number" || rowIndex < 0) {
-      return NextResponse.json({ error: "Invalid row index" }, { status: 400 });
+    if (typeof rowId !== "number" || rowId < 0) {
+      return NextResponse.json({ error: "Invalid row ID" }, { status: 400 });
     }
 
     const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
@@ -27,43 +26,15 @@ export async function POST(req: NextRequest) {
       auth: { persistSession: false },
     });
 
-    // Fetch the existing Excel file from Supabase
-    const { data: fileData, error: fetchError } = await supabase
-      .storage
-      .from("uploads")
-      .download("data.xlsx");
+    // Delete from database
+    const { error } = await supabase
+      .from("stock_data")
+      .delete()
+      .eq("id", rowId);
 
-    if (fetchError) {
-      console.error("Error fetching Excel file:", fetchError);
-      return NextResponse.json({ error: `Failed to fetch Excel file: ${fetchError.message}` }, { status: 500 });
-    }
-
-    // Parse the Excel file
-    const fileBuffer = await fileData.arrayBuffer();
-    const workbook = XLSX.read(fileBuffer, { type: "array" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-    // Remove the row (rowIndex + 1 because of header row)
-    sheetData.splice(rowIndex + 1, 1);
-
-    // Convert back to Excel format
-    const updatedWorksheet = XLSX.utils.aoa_to_sheet(sheetData);
-    workbook.Sheets[sheetName] = updatedWorksheet;
-    const updatedExcel = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-
-    // Remove the old file and upload the updated Excel file back to Supabase
-    await supabase.storage.from("uploads").remove(["data.xlsx"]);
-    
-    const { error: uploadError } = await supabase
-      .storage
-      .from("uploads")
-      .upload("data.xlsx", updatedExcel);
-
-    if (uploadError) {
-      console.error("Error uploading updated Excel file:", uploadError);
-      return NextResponse.json({ error: `Failed to upload updated Excel file: ${uploadError.message}` }, { status: 500 });
+    if (error) {
+      console.error("Error deleting row:", error);
+      return NextResponse.json({ error: `Failed to delete: ${error.message}` }, { status: 500 });
     }
 
     return NextResponse.json({ message: "Row deleted successfully" }, { status: 200 });

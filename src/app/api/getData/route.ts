@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import * as XLSX from "xlsx";
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,31 +20,24 @@ export async function GET(req: NextRequest) {
       auth: { persistSession: false },
     });
 
-    // Fetch the existing Excel file from Supabase
-    const { data: fileData, error: fetchError } = await supabase
-      .storage
-      .from("uploads")
-      .download("data.xlsx");
+    // Fetch data from database
+    const { data, error } = await supabase
+      .from("stock_data")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    if (fetchError) {
-      console.error("Error fetching Excel file:", fetchError);
-      return NextResponse.json({ error: `Failed to fetch Excel file: ${fetchError.message}` }, { status: 500 });
+    if (error) {
+      console.error("Error fetching data:", error);
+      return NextResponse.json({ error: `Failed to fetch data: ${error.message}` }, { status: 500 });
     }
 
-    // Parse the Excel file
-    const fileBuffer = await fileData.arrayBuffer();
-    const workbook = XLSX.read(fileBuffer, { type: "array" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-    // Skip header row and format data
-    const headers = sheetData[0] || [];
-    const rows = sheetData.slice(1).map(row => ({
-      date: row[0] || "",
-      name: row[1] || "",
-      partNumber: row[2] || "",
-      quantity: row[3] || "",
+    // Format data for frontend
+    const rows = (data || []).map(row => ({
+      id: row.id,
+      date: row.date || "",
+      name: row.name || "",
+      partNumber: row.part_number || "",
+      quantity: row.quantity || "",
     }));
 
     return NextResponse.json({ data: rows }, { status: 200 });

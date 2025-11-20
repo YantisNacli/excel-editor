@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 
 type DataRow = {
+  id: number;
   date: string;
   name: string;
   partNumber: string;
@@ -33,14 +34,14 @@ export default function ViewPage() {
     }
   };
 
-  const handleDelete = async (rowIndex: number) => {
+  const handleDelete = async (rowId: number) => {
     if (!confirm("Are you sure you want to delete this entry?")) return;
 
     try {
       const res = await fetch("/api/deleteRow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rowIndex }),
+        body: JSON.stringify({ rowId }),
       });
 
       if (res.ok) {
@@ -94,15 +95,15 @@ export default function ViewPage() {
                     </td>
                   </tr>
                 ) : (
-                  data.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50">
+                  data.map((row) => (
+                    <tr key={row.id} className="hover:bg-gray-50">
                       <td className="px-4 py-2 border-b text-gray-900">{row.date}</td>
                       <td className="px-4 py-2 border-b text-gray-900">{row.name}</td>
                       <td className="px-4 py-2 border-b text-gray-900">{row.partNumber}</td>
                       <td className="px-4 py-2 border-b text-gray-900">{row.quantity}</td>
                       <td className="px-4 py-2 border-b">
                         <button
-                          onClick={() => handleDelete(idx)}
+                          onClick={() => handleDelete(row.id)}
                           className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
                         >
                           Delete

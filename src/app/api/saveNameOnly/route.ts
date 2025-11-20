@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import * as XLSX from "xlsx";
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,50 +29,27 @@ export async function POST(req: NextRequest) {
       auth: { persistSession: false },
     });
 
-    // Fetch the existing Excel file from Supabase
-    const { data: fileData, error: fetchError } = await supabase
-      .storage
-      .from("uploads")
-      .download("data.xlsx");
-
-    if (fetchError) {
-      console.error("Error fetching Excel file:", fetchError);
-      return NextResponse.json({ error: `Failed to fetch Excel file: ${fetchError.message}` }, { status: 500 });
-    }
-
-    // Parse the Excel file
-    const fileBuffer = await fileData.arrayBuffer();
-    const workbook = XLSX.read(fileBuffer, { type: "array" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-    // Add the new name to the Excel data (with current date, empty part number and quantity)
+    // Insert into database with current date
     const currentDate = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-    sheetData.push([currentDate, name, "", ""]);
-
-    // Convert back to Excel format
-    const updatedWorksheet = XLSX.utils.aoa_to_sheet(sheetData);
-    workbook.Sheets[sheetName] = updatedWorksheet;
-    const updatedExcel = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-
-    // Remove the old file and upload the updated Excel file back to Supabase
-    await supabase.storage.from("uploads").remove(["data.xlsx"]);
     
-    const { error: uploadError } = await supabase
-      .storage
-      .from("uploads")
-      .upload("data.xlsx", updatedExcel);
+    const { error } = await supabase
+      .from("stock_data")
+      .insert([{ 
+        date: currentDate, 
+        name, 
+        part_number: "", 
+        quantity: "" 
+      }]);
 
-    if (uploadError) {
-      console.error("Error uploading updated Excel file:", uploadError);
-      return NextResponse.json({ error: `Failed to upload updated Excel file: ${uploadError.message}` }, { status: 500 });
+    if (error) {
+      console.error("Error inserting into database:", error);
+      return NextResponse.json({ error: `Failed to save: ${error.message}` }, { status: 500 });
     }
 
-    return NextResponse.json({ message: "Name saved to Excel file successfully" }, { status: 200 });
+    return NextResponse.json({ message: "Name saved successfully" }, { status: 200 });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error("Error saving name to Excel file:", errorMsg);
+    console.error("Error saving name:", errorMsg);
     return NextResponse.json({ error: `Server error: ${errorMsg}` }, { status: 500 });
   }
 }
