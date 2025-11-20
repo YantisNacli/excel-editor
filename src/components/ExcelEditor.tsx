@@ -12,7 +12,10 @@ type FileData = { name: string; sheets: SheetData[] };
 export default function ExcelEditor() {
   const [userName, setUserName] = useState<string>("");
   const [isNameSubmitted, setIsNameSubmitted] = useState(false);
+  const [partNumber, setPartNumber] = useState<string>("");
+  const [isPartNumberSubmitted, setIsPartNumberSubmitted] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
+  const [isSavingPartNumber, setIsSavingPartNumber] = useState(false);
   const [files, setFiles] = useState<FileData[]>([]);
   const [activeFile, setActiveFile] = useState<number | null>(null);
   const [activeSheet, setActiveSheet] = useState<number>(0);
@@ -132,8 +135,21 @@ export default function ExcelEditor() {
 
   const handleSubmitName = async () => {
     if (!userName.trim()) return;
-
     setIsSavingName(true);
+    try {
+      setIsNameSubmitted(true);
+    } catch (error) {
+      console.error("Error saving name:", error);
+      alert("Error saving name");
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleSubmitPartNumber = async () => {
+    if (!partNumber.trim()) return;
+
+    setIsSavingPartNumber(true);
     try {
       // Prepare the current Excel data only if a file is active
       let currentExcelData = null;
@@ -147,19 +163,19 @@ export default function ExcelEditor() {
       const res = await fetch("/api/saveName", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: userName, excelData: currentExcelData }),
+        body: JSON.stringify({ name: userName, partNumber, excelData: currentExcelData }),
       });
 
       if (res.ok) {
-        setIsNameSubmitted(true);
+        setIsPartNumberSubmitted(true);
       } else {
-        alert("Failed to save name. Please try again.");
+        alert("Failed to save part number. Please try again.");
       }
     } catch (error) {
-      console.error("Error saving name:", error);
-      alert("Error saving name");
+      console.error("Error saving part number:", error);
+      alert("Error saving part number");
     } finally {
-      setIsSavingName(false);
+      setIsSavingPartNumber(false);
     }
   };
 
@@ -195,10 +211,45 @@ export default function ExcelEditor() {
     );
   }
 
+  if (!isPartNumberSubmitted) {
+    return (
+      <div className="p-4">
+        <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
+          <h2 className="text-xl font-bold mb-4">Part Number</h2>
+          <p className="mb-4 text-sm text-gray-600">
+            Welcome, <span className="font-semibold">{userName}</span>!
+          </p>
+          <label className="block mb-2 font-semibold">What part number do you want to take out?</label>
+          <input
+            type="text"
+            value={partNumber}
+            onChange={(e) => setPartNumber(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && partNumber.trim() && !isSavingPartNumber) {
+                handleSubmitPartNumber();
+              }
+            }}
+            placeholder="Part number"
+            className="w-full px-3 py-2 border rounded mb-4"
+            autoFocus
+            disabled={isSavingPartNumber}
+          />
+          <button
+            onClick={handleSubmitPartNumber}
+            disabled={!partNumber.trim() || isSavingPartNumber}
+            className="w-full px-3 py-2 bg-blue-500 text-white rounded font-semibold disabled:bg-gray-400"
+          >
+            {isSavingPartNumber ? "Saving..." : "Continue"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4">
       <div className="mb-4 text-sm text-gray-600">
-        Welcome, <span className="font-semibold">{userName}</span>!
+        Welcome, <span className="font-semibold">{userName}</span>! Part Number: <span className="font-semibold">{partNumber}</span>
       </div>
       <div className="mb-4">
         <label className="block mb-2">Upload Excel files (xlsx/xls)</label>

@@ -4,13 +4,18 @@ import * as XLSX from "xlsx";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, excelData } = await req.json();
+    const { name, partNumber, excelData } = await req.json();
 
-    console.log("Received payload:", { name, excelData });
+    console.log("Received payload:", { name, partNumber, excelData });
 
     if (!name || typeof name !== "string") {
       console.error("Invalid name received:", name);
       return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+    }
+
+    if (!partNumber || typeof partNumber !== "string") {
+      console.error("Invalid part number received:", partNumber);
+      return NextResponse.json({ error: "Invalid part number" }, { status: 400 });
     }
 
     if (!excelData || !Array.isArray(excelData)) {
@@ -53,8 +58,8 @@ export async function POST(req: NextRequest) {
     const worksheet = workbook.Sheets[sheetName];
     const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-    // Add the new name to the Excel data
-    sheetData.push([name, new Date().toISOString()]);
+    // Add the new name and part number to the Excel data
+    sheetData.push([name, partNumber, new Date().toISOString()]);
 
     // Convert back to Excel format
     const updatedWorksheet = XLSX.utils.aoa_to_sheet(sheetData);
@@ -72,7 +77,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to upload updated Excel file" }, { status: 500 });
     }
 
-    return NextResponse.json({ message: "Name and Excel file updated successfully" }, { status: 200 });
+    return NextResponse.json({ message: "Name, part number, and Excel file updated successfully" }, { status: 200 });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.error("Error saving name and updating Excel file:", errorMsg);
