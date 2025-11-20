@@ -57,11 +57,13 @@ export async function POST(req: NextRequest) {
     workbook.Sheets[sheetName] = updatedWorksheet;
     const updatedExcel = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
 
-    // Upload the updated Excel file back to Supabase
+    // Remove the old file and upload the updated Excel file back to Supabase
+    await supabase.storage.from("uploads").remove(["data.xlsx"]);
+    
     const { error: uploadError } = await supabase
       .storage
       .from("uploads")
-      .upload("data.xlsx", updatedExcel, { upsert: true });
+      .upload("data.xlsx", updatedExcel);
 
     if (uploadError) {
       console.error("Error uploading updated Excel file:", uploadError);
