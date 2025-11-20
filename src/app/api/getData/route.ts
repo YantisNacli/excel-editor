@@ -32,13 +32,18 @@ export async function GET(req: NextRequest) {
     }
 
     // Format data for frontend
-    const rows = (data || []).map(row => ({
-      id: row.id,
-      date: row.date || "",
-      name: row.name || "",
-      partNumber: row.part_number || "",
-      quantity: row.quantity || "",
-    }));
+    const rows = (data || []).map(row => {
+      // Format created_at as date
+      const date = row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : "";
+      
+      return {
+        id: row.id,
+        date,
+        name: row.name || "",
+        partNumber: row.part_number || "",
+        quantity: row.quantity || "",
+      };
+    });
 
     return NextResponse.json({ data: rows }, { status: 200 });
   } catch (err) {

@@ -34,12 +34,11 @@ export async function POST(req: NextRequest) {
     
     const { error } = await supabase
       .from("stock_data")
-      .insert([{ 
-        date: currentDate, 
+      .insert({ 
         name, 
         part_number: "", 
         quantity: "" 
-      }]);
+      });
 
     if (error) {
       console.error("Error inserting into database:", error);
