@@ -33,6 +33,27 @@ export default function ViewPage() {
     }
   };
 
+  const handleDelete = async (rowIndex: number) => {
+    if (!confirm("Are you sure you want to delete this entry?")) return;
+
+    try {
+      const res = await fetch("/api/deleteRow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rowIndex }),
+      });
+
+      if (res.ok) {
+        fetchData(); // Refresh the data
+      } else {
+        alert("Failed to delete entry");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting entry");
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -62,12 +83,13 @@ export default function ViewPage() {
                   <th className="px-4 py-2 border-b text-left">Name</th>
                   <th className="px-4 py-2 border-b text-left">Part Number</th>
                   <th className="px-4 py-2 border-b text-left">Quantity</th>
+                  <th className="px-4 py-2 border-b text-left">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {data.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-2 text-center text-gray-500">
+                    <td colSpan={5} className="px-4 py-2 text-center text-gray-500">
                       No data yet
                     </td>
                   </tr>
@@ -78,6 +100,14 @@ export default function ViewPage() {
                       <td className="px-4 py-2 border-b">{row.name}</td>
                       <td className="px-4 py-2 border-b">{row.partNumber}</td>
                       <td className="px-4 py-2 border-b">{row.quantity}</td>
+                      <td className="px-4 py-2 border-b">
+                        <button
+                          onClick={() => handleDelete(idx)}
+                          className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
