@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     const { data: fileData, error: fetchError } = await supabase
       .storage
       .from("uploads")
-      .download("user_data.xlsx");
+      .download("userdata.xlsx");
 
     if (fetchError) {
       console.error("Error fetching Excel file:", fetchError);
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     const { error: uploadError } = await supabase
       .storage
       .from("uploads")
-      .upload("user_data.xlsx", updatedExcel, { upsert: true });
+      .upload("userdata.xlsx", updatedExcel, { upsert: true });
 
     if (uploadError) {
       console.error("Error uploading updated Excel file:", uploadError);
