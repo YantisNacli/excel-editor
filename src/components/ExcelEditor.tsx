@@ -147,7 +147,8 @@ export default function ExcelEditor() {
       if (res.ok) {
         setIsNameSubmitted(true);
       } else {
-        alert("Failed to save name. Please try again.");
+        const errorData = await res.json();
+        alert(`Failed to save name: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error("Error saving name:", error);
@@ -180,7 +181,8 @@ export default function ExcelEditor() {
       if (res.ok) {
         setIsPartNumberSubmitted(true);
       } else {
-        alert("Failed to save part number. Please try again.");
+        const errorData = await res.json();
+        alert(`Failed to save part number: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error("Error saving part number:", error);
