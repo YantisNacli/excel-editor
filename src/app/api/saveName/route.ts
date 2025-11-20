@@ -13,10 +13,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid name" }, { status: 400 });
     }
 
-    if (!partNumber || typeof partNumber !== "string") {
-      console.error("Invalid part number received:", partNumber);
-      return NextResponse.json({ error: "Invalid part number" }, { status: 400 });
-    }
+    // partNumber and quantity are optional for now
+    const quantity = (req as any).body?.quantity || "";
 
     if (!excelData || !Array.isArray(excelData)) {
       console.error("Invalid Excel data received:", excelData);
@@ -58,8 +56,9 @@ export async function POST(req: NextRequest) {
     const worksheet = workbook.Sheets[sheetName];
     const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-    // Add the new name and part number to the Excel data
-    sheetData.push([name, partNumber, new Date().toISOString()]);
+    // Add the new name, part number and quantity to the Excel data with current date
+    const currentDate = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    sheetData.push([currentDate, name, partNumber || "", quantity || ""]);
 
     // Convert back to Excel format
     const updatedWorksheet = XLSX.utils.aoa_to_sheet(sheetData);

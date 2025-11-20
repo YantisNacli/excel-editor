@@ -48,8 +48,9 @@ export async function POST(req: NextRequest) {
     const worksheet = workbook.Sheets[sheetName];
     const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-    // Add the new name to the Excel data (with empty part number and timestamp)
-    sheetData.push([name, "", new Date().toISOString()]);
+    // Add the new name to the Excel data (with current date, empty part number and quantity)
+    const currentDate = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    sheetData.push([currentDate, name, "", ""]);
 
     // Convert back to Excel format
     const updatedWorksheet = XLSX.utils.aoa_to_sheet(sheetData);
