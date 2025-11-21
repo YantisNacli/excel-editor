@@ -347,7 +347,7 @@ export default function ExcelEditor() {
                   setShowSuggestions(false);
                 }
               }}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               onFocus={() => {
                 if (suggestions.length > 0) {
                   setShowSuggestions(true);
@@ -368,7 +368,10 @@ export default function ExcelEditor() {
                 {suggestions.map((suggestion, index) => (
                   <div
                     key={index}
-                    onClick={() => handleSelectSuggestion(suggestion)}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectSuggestion(suggestion);
+                    }}
                     className="px-3 py-2 hover:bg-blue-100 cursor-pointer border-b last:border-b-0"
                   >
                     {suggestion}
