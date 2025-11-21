@@ -45,13 +45,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Empty sheet" }, { status: 400 });
     }
 
-    // Find the header row
+    // Find the header row - specifically looking in row index 1 (second row)
     let headerRowIndex = -1;
     let materialIndex = -1;
     let actualCountsIndex = -1;
     
-    for (let i = 0; i < Math.min(10, jsonData.length); i++) {
-      const row = jsonData[i] as any[];
+    // Check row index 1 first (second row)
+    if (jsonData.length > 1) {
+      const row = jsonData[1] as any[];
       const matIdx = row.findIndex((cell) =>
         cell && cell.toString().toLowerCase().includes("material")
       );
@@ -61,10 +62,31 @@ export async function POST(req: NextRequest) {
       );
       
       if (matIdx !== -1 && actIdx !== -1) {
-        headerRowIndex = i;
+        headerRowIndex = 1;
         materialIndex = matIdx;
         actualCountsIndex = actIdx;
-        break;
+      }
+    }
+    
+    // If not found in row 1, search other rows
+    if (headerRowIndex === -1) {
+      for (let i = 0; i < Math.min(10, jsonData.length); i++) {
+        if (i === 1) continue; // Already checked
+        const row = jsonData[i] as any[];
+        const matIdx = row.findIndex((cell) =>
+          cell && cell.toString().toLowerCase().includes("material")
+        );
+        const actIdx = row.findIndex((cell) =>
+          cell && cell.toString().toLowerCase().includes("actual") && 
+          cell.toString().toLowerCase().includes("count")
+        );
+        
+        if (matIdx !== -1 && actIdx !== -1) {
+          headerRowIndex = i;
+          materialIndex = matIdx;
+          actualCountsIndex = actIdx;
+          break;
+        }
       }
     }
 
