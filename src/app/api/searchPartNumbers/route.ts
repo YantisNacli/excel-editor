@@ -57,8 +57,16 @@ export async function POST(req: NextRequest) {
     );
 
     if (partNumberIndex === -1) {
+      // Debug: Return available sheet names and column headers
       return NextResponse.json(
-        { error: "Material column not found in Master Data sheet" },
+        { 
+          error: "Material column not found", 
+          debug: {
+            availableSheets: workbook.SheetNames,
+            selectedSheet: sheetName,
+            availableColumns: headers
+          }
+        },
         { status: 400 }
       );
     }
