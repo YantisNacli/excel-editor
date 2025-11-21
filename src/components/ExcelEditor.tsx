@@ -238,6 +238,15 @@ export default function ExcelEditor() {
   const handleSubmitQuantity = async () => {
     if (!newQuantity.trim()) return;
 
+    // Validate format: must start with + or - followed by a number
+    const trimmed = newQuantity.trim();
+    const regex = /^[+-]\d+$/;
+    
+    if (!regex.test(trimmed)) {
+      alert("Please enter a valid quantity format. Use +5 to add or -3 to remove.");
+      return;
+    }
+
     setIsSavingQuantity(true);
     try {
       // Save to database with the name, part number, and quantity
