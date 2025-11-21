@@ -242,11 +242,11 @@ export default function ExcelEditor() {
 
     setIsSavingQuantity(true);
     try {
-      // Save to database with the new quantity
+      // Save to database with the name, part number, and quantity
       const saveRes = await fetch("/api/saveName", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: userName, partNumber }),
+        body: JSON.stringify({ name: userName, partNumber, quantity: newQuantity }),
       });
 
       if (!saveRes.ok) {

@@ -8,7 +8,7 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, partNumber } = await req.json();
+    const { name, partNumber, quantity } = await req.json();
 
     if (!name || typeof name !== "string") {
       return NextResponse.json({ error: "Invalid name" }, { status: 400 });
@@ -18,13 +18,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid part number" }, { status: 400 });
     }
 
+    if (!quantity || typeof quantity !== "string") {
+      return NextResponse.json({ error: "Invalid quantity" }, { status: 400 });
+    }
+
     // Insert into the database
     const { error } = await supabase
       .from("stock_data")
       .insert({
         name,
         part_number: partNumber,
-        quantity: "", // Empty for now, can be added later
+        quantity,
       });
 
     if (error) {
@@ -36,12 +40,12 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { message: "Part number saved successfully" },
+      { message: "Data saved successfully" },
       { status: 200 }
     );
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error("Error saving part number:", errorMsg);
+    console.error("Error saving data:", errorMsg);
     return NextResponse.json(
       { error: `Server error: ${errorMsg}` },
       { status: 500 }
