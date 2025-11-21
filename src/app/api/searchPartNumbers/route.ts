@@ -93,23 +93,21 @@ export async function POST(req: NextRequest) {
         const partStr = partNumber.toString();
         const partLower = partStr.toLowerCase();
         
-        // Check if it matches the query and hasn't been added yet
-        if (partLower.includes(queryLower) && !seen.has(partStr)) {
+        // Only match if it starts with the query (not contains anywhere)
+        if (partLower.startsWith(queryLower) && !seen.has(partStr)) {
           matches.push(partStr);
           seen.add(partStr);
         }
       }
     }
 
-    // Sort matches: exact matches first, then starts-with, then contains
+    // Sort matches: exact matches first, then alphabetically
     matches.sort((a, b) => {
       const aLower = a.toLowerCase();
       const bLower = b.toLowerCase();
       
       if (aLower === queryLower && bLower !== queryLower) return -1;
       if (aLower !== queryLower && bLower === queryLower) return 1;
-      if (aLower.startsWith(queryLower) && !bLower.startsWith(queryLower)) return -1;
-      if (!aLower.startsWith(queryLower) && bLower.startsWith(queryLower)) return 1;
       return a.localeCompare(b);
     });
 
