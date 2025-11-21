@@ -262,6 +262,17 @@ export default function ExcelEditor() {
         return;
       }
 
+      // Update the actual count in Excel
+      const updateRes = await fetch("/api/updateActualCount", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partNumber, quantityChange: newQuantity }),
+      });
+
+      if (!updateRes.ok) {
+        console.error("Failed to update Excel file");
+      }
+
       // Get location from Excel
       const locRes = await fetch("/api/getLocation", {
         method: "POST",
