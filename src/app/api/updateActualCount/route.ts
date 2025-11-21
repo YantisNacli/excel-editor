@@ -1,53 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import * as XLSX from "xlsx";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const MAX_RETRIES = 10;
-const RETRY_DELAY = 500; // ms
-
-async function acquireLock(): Promise<boolean> {
-  const lockId = "excel_update_lock";
-  const { data, error } = await supabase
-    .from("stock_data")
-    .select("id")
-    .eq("name", lockId)
-    .maybeSingle();
-
-  if (data) {
-    return false; // Lock already exists
-  }
-
-  // Try to create the lock
-  const { error: insertError } = await supabase
-    .from("stock_data")
-    .insert({ 
-      name: lockId, 
-      part_number: "LOCK", 
-      quantity: new Date().toISOString() 
-    });
-
-  return !insertError;
-}
-
-async function releaseLock(): Promise<void> {
-  await supabase
-    .from("stock_data")
-    .delete()
-    .eq("name", "excel_update_lock");
-}
-
-async function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 export async function POST(req: NextRequest) {
-  let lockAcquired = false;
-  
   try {
     const { partNumber, quantityChange } = await req.json();
 
@@ -65,190 +24,61 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid quantity format" }, { status: 400 });
     }
 
-    const fileName = "Copy of Stock Inventory_29 Oct 2025.xlsm";
+    // Update inventory table using atomic increment
+    const { data, error } = await supabase.rpc('increment_actual_count', {
+      p_material: partNumber,
+      p_change: change
+    });
 
-    // Try to acquire lock with retries
-    for (let i = 0; i < MAX_RETRIES; i++) {
-      lockAcquired = await acquireLock();
-      if (lockAcquired) break;
-      await sleep(RETRY_DELAY);
-    }
-
-    if (!lockAcquired) {
-      return NextResponse.json(
-        { error: "System busy, please try again" },
-        { status: 503 }
-      );
-    }
-
-    // Perform the update
-    const result = await performUpdate(partNumber, change, fileName);
-    
-    // Explicitly release lock before returning
-    await releaseLock();
-    lockAcquired = false; // Mark as released
-    
-    return result;
-  } catch (error) {
-    console.error("Error updating actual count:", error);
-    return NextResponse.json(
-      { error: "Failed to update actual count" },
-      { status: 500 }
-    );
-  } finally {
-    // Ensure lock is always released
-    if (lockAcquired) {
-      try {
-        await releaseLock();
-        console.log("Lock released in finally block");
-      } catch (releaseError) {
-        console.error("Error releasing lock:", releaseError);
-      }
-    }
-  }
-}
-
-async function performUpdate(partNumber: string, change: number, fileName: string): Promise<NextResponse> {
-  try {
-
-    // Download the Excel file from Supabase Storage
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from("uploads")
-      .download(fileName);
-
-    if (downloadError || !fileData) {
-      return NextResponse.json(
-        { error: "File not found" },
-        { status: 404 }
-      );
-    }
-
-    // Convert blob to ArrayBuffer
-    const arrayBuffer = await fileData.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: "array" });
-
-    // Find the "Master Data" sheet
-    const sheetName = workbook.SheetNames.find((name) =>
-      name.toLowerCase().includes("master")
-    ) || workbook.SheetNames[0];
-    
-    const worksheet = workbook.Sheets[sheetName];
-
-    // Convert to JSON
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-
-    if (jsonData.length === 0) {
-      return NextResponse.json({ error: "Empty sheet" }, { status: 400 });
-    }
-
-    // Find the header row - specifically looking in row index 1 (second row)
-    let headerRowIndex = -1;
-    let materialIndex = -1;
-    let actualCountsIndex = -1;
-    
-    // Check row index 1 first (second row)
-    if (jsonData.length > 1) {
-      const row = jsonData[1] as any[];
-      const matIdx = row.findIndex((cell) =>
-        cell && cell.toString().toLowerCase().includes("material")
-      );
-      const actIdx = row.findIndex((cell) =>
-        cell && cell.toString().toLowerCase().includes("actual") && 
-        cell.toString().toLowerCase().includes("count")
-      );
+    if (error) {
+      // If RPC doesn't exist, fall back to manual update
+      console.log("RPC not found, using manual update");
       
-      if (matIdx !== -1 && actIdx !== -1) {
-        headerRowIndex = 1;
-        materialIndex = matIdx;
-        actualCountsIndex = actIdx;
-      }
-    }
-    
-    // If not found in row 1, search other rows
-    if (headerRowIndex === -1) {
-      for (let i = 0; i < Math.min(10, jsonData.length); i++) {
-        if (i === 1) continue;
-        const row = jsonData[i] as any[];
-        const matIdx = row.findIndex((cell) =>
-          cell && cell.toString().toLowerCase().includes("material")
+      // Get current value
+      const { data: currentData, error: selectError } = await supabase
+        .from("inventory")
+        .select("actual_count")
+        .ilike("material", partNumber)
+        .maybeSingle();
+
+      if (selectError) {
+        console.error("Error querying inventory:", selectError);
+        return NextResponse.json(
+          { error: "Failed to update actual count" },
+          { status: 500 }
         );
-        const actIdx = row.findIndex((cell) =>
-          cell && cell.toString().toLowerCase().includes("actual") && 
-          cell.toString().toLowerCase().includes("count")
+      }
+
+      if (!currentData) {
+        return NextResponse.json(
+          { error: "Part number not found in inventory" },
+          { status: 404 }
         );
-        
-        if (matIdx !== -1 && actIdx !== -1) {
-          headerRowIndex = i;
-          materialIndex = matIdx;
-          actualCountsIndex = actIdx;
-          break;
-        }
       }
-    }
 
-    if (headerRowIndex === -1 || materialIndex === -1 || actualCountsIndex === -1) {
-      return NextResponse.json(
-        { error: "Material or Actual Counts column not found" },
-        { status: 400 }
-      );
-    }
+      const currentValue = currentData.actual_count || 0;
+      const newValue = currentValue + change;
 
-    // Search for the matching part number and update
-    let updated = false;
-    for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
-      const row = jsonData[i];
-      const material = row[materialIndex];
-      
-      if (material && material.toString().toLowerCase() === partNumber.toLowerCase()) {
-        const currentCount = row[actualCountsIndex];
-        const currentValue = (currentCount === undefined || currentCount === null || currentCount === "" || currentCount === 0) 
-          ? 0 
-          : parseInt(currentCount.toString());
-        
-        const newValue = currentValue + change;
-        jsonData[i][actualCountsIndex] = newValue;
-        updated = true;
-        break;
+      // Update with new value
+      const { error: updateError } = await supabase
+        .from("inventory")
+        .update({ actual_count: newValue })
+        .ilike("material", partNumber);
+
+      if (updateError) {
+        console.error("Error updating inventory:", updateError);
+        return NextResponse.json(
+          { error: "Failed to update actual count" },
+          { status: 500 }
+        );
       }
-    }
-
-    if (!updated) {
-      return NextResponse.json(
-        { error: "Part number not found in inventory" },
-        { status: 404 }
-      );
-    }
-
-    // Convert back to worksheet
-    const newWorksheet = XLSX.utils.aoa_to_sheet(jsonData);
-    workbook.Sheets[sheetName] = newWorksheet;
-
-    // Write to buffer
-    const updatedBuffer = XLSX.write(workbook, { type: "array", bookType: "xlsm" });
-
-    // Delete old file and upload new one
-    await supabase.storage.from("uploads").remove([fileName]);
-    
-    const { error: uploadError } = await supabase.storage
-      .from("uploads")
-      .upload(fileName, updatedBuffer, {
-        contentType: "application/vnd.ms-excel.sheet.macroEnabled.12",
-        upsert: true
-      });
-
-    if (uploadError) {
-      console.error("Error uploading updated file:", uploadError);
-      return NextResponse.json(
-        { error: "Failed to update Excel file" },
-        { status: 500 }
-      );
     }
 
     return NextResponse.json({ 
       message: "Actual count updated successfully"
     });
   } catch (error) {
-    console.error("Error in performUpdate:", error);
+    console.error("Error updating actual count:", error);
     return NextResponse.json(
       { error: "Failed to update actual count" },
       { status: 500 }

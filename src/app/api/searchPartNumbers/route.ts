@@ -9,97 +9,35 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { query, fileName } = await req.json();
+    const { query } = await req.json();
 
     if (!query || typeof query !== "string") {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
-    // Use the provided fileName or default to the stock inventory file
-    const searchFileName = fileName || "Copy of Stock Inventory_29 Oct 2025.xlsm";
-
-    // Download the Excel file from Supabase Storage
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from("uploads")
-      .download(searchFileName);
-
-    if (downloadError || !fileData) {
-      return NextResponse.json(
-        { error: `File not found: ${searchFileName}` },
-        { status: 404 }
-      );
-    }
-
-    // Convert blob to ArrayBuffer
-    const arrayBuffer = await fileData.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: "array" });
-
-    // Find the "Master Data" sheet
-    const sheetName = workbook.SheetNames.find((name) =>
-      name.toLowerCase().includes("master")
-    ) || workbook.SheetNames[0];
-    
-    const worksheet = workbook.Sheets[sheetName];
-
-    // Convert to JSON
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-
-    if (jsonData.length === 0) {
+    if (query.length < 2) {
       return NextResponse.json({ matches: [] });
     }
 
-    // Find the header row by looking for "Material" column in the first 10 rows
-    let headerRowIndex = -1;
-    let partNumberIndex = -1;
-    
-    for (let i = 0; i < Math.min(10, jsonData.length); i++) {
-      const row = jsonData[i] as any[];
-      const materialIndex = row.findIndex((cell) =>
-        cell && cell.toString().toLowerCase().includes("material")
-      );
-      
-      if (materialIndex !== -1) {
-        headerRowIndex = i;
-        partNumberIndex = materialIndex;
-        break;
-      }
-    }
-
-    if (headerRowIndex === -1 || partNumberIndex === -1) {
-      // Debug: Return available sheet names and column headers from first few rows
-      return NextResponse.json(
-        { 
-          error: "Material column not found", 
-          debug: {
-            availableSheets: workbook.SheetNames,
-            selectedSheet: sheetName,
-            first5Rows: jsonData.slice(0, 5)
-          }
-        },
-        { status: 400 }
-      );
-    }
-
-    // Search for matches (skip header row)
     const queryLower = query.toLowerCase();
-    const matches: string[] = [];
-    const seen = new Set<string>();
 
-    for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
-      const row = jsonData[i];
-      const partNumber = row[partNumberIndex];
-      
-      if (partNumber && typeof partNumber !== "undefined") {
-        const partStr = partNumber.toString();
-        const partLower = partStr.toLowerCase();
-        
-        // Only match if it starts with the query (not contains anywhere)
-        if (partLower.startsWith(queryLower) && !seen.has(partStr)) {
-          matches.push(partStr);
-          seen.add(partStr);
-        }
-      }
+    // Query inventory table for matching materials
+    const { data, error } = await supabase
+      .from("inventory")
+      .select("material")
+      .ilike("material", `${query}%`)
+      .order("material")
+      .limit(10);
+
+    if (error) {
+      console.error("Error querying inventory:", error);
+      return NextResponse.json(
+        { error: "Failed to search part numbers" },
+        { status: 500 }
+      );
     }
+
+    const matches = data ? data.map(item => item.material) : [];
 
     // Sort matches: exact matches first, then alphabetically
     matches.sort((a, b) => {
@@ -111,8 +49,7 @@ export async function POST(req: NextRequest) {
       return a.localeCompare(b);
     });
 
-    // Limit to top 10 matches
-    return NextResponse.json({ matches: matches.slice(0, 10) });
+    return NextResponse.json({ matches });
   } catch (error) {
     console.error("Error searching part numbers:", error);
     return NextResponse.json(
