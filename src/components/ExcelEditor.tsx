@@ -371,7 +371,8 @@ export default function ExcelEditor() {
             <h3 className="font-bold text-lg mb-2">Current Actual Count:</h3>
             <p className="text-2xl font-semibold text-blue-700">{actualCount}</p>
           </div>
-          <label className="block mb-2 font-semibold">What is the new quantity in the box?</label>
+          <label className="block mb-2 font-semibold">How much are you adding or removing?</label>
+          <p className="text-sm text-gray-600 mb-3">Use + for adding or - for removing (e.g., +5 or -3)</p>
           <input
             type="text"
             value={newQuantity}
@@ -381,7 +382,7 @@ export default function ExcelEditor() {
                 handleSubmitQuantity();
               }
             }}
-            placeholder="New quantity"
+            placeholder="+5 or -3"
             className="w-full px-3 py-2 border rounded mb-4"
             autoFocus
             disabled={isSavingQuantity}
