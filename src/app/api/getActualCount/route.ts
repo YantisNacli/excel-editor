@@ -82,8 +82,16 @@ export async function POST(req: NextRequest) {
       
       if (material && material.toString().toLowerCase() === partNumber.toLowerCase()) {
         const actualCount = row[actualCountsIndex];
+        
+        // Check if empty, null, undefined, or 0
+        if (actualCount === undefined || actualCount === null || actualCount === "" || actualCount === 0 || actualCount === "0") {
+          return NextResponse.json({ 
+            actualCount: "There is no stock in the room"
+          });
+        }
+        
         return NextResponse.json({ 
-          actualCount: actualCount !== undefined && actualCount !== null ? actualCount.toString() : "No data"
+          actualCount: actualCount.toString()
         });
       }
     }
