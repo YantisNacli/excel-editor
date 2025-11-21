@@ -7,6 +7,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// In-memory queue to handle concurrent updates
+let updateQueue: Promise<any> = Promise.resolve();
+
 export async function POST(req: NextRequest) {
   try {
     const { partNumber, quantityChange } = await req.json();
@@ -26,6 +29,41 @@ export async function POST(req: NextRequest) {
     }
 
     const fileName = "Copy of Stock Inventory_29 Oct 2025.xlsm";
+
+    // Add this update to the queue
+    const result = await new Promise<NextResponse>((resolve) => {
+      updateQueue = updateQueue
+        .then(async () => {
+          try {
+            const response = await performUpdate(partNumber, change, fileName);
+            resolve(response);
+          } catch (error) {
+            resolve(NextResponse.json(
+              { error: "Failed to update" },
+              { status: 500 }
+            ));
+          }
+        })
+        .catch(() => {
+          resolve(NextResponse.json(
+            { error: "Queue error" },
+            { status: 500 }
+          ));
+        });
+    });
+
+    return result;
+  } catch (error) {
+    console.error("Error updating actual count:", error);
+    return NextResponse.json(
+      { error: "Failed to update actual count" },
+      { status: 500 }
+    );
+  }
+}
+
+async function performUpdate(partNumber: string, change: number, fileName: string): Promise<NextResponse> {
+  try {
 
     // Download the Excel file from Supabase Storage
     const { data: fileData, error: downloadError } = await supabase.storage
@@ -164,7 +202,7 @@ export async function POST(req: NextRequest) {
       message: "Actual count updated successfully"
     });
   } catch (error) {
-    console.error("Error updating actual count:", error);
+    console.error("Error in performUpdate:", error);
     return NextResponse.json(
       { error: "Failed to update actual count" },
       { status: 500 }
