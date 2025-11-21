@@ -6,10 +6,8 @@ export default function ImportPage() {
   const [password, setPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,47 +17,6 @@ export default function ImportPage() {
       setError("");
     } else {
       setError("❌ Incorrect password");
-    }
-  };
-
-  const handleFileUpload = async () => {
-    if (!selectedFile) {
-      setError("❌ Please select a file first");
-      return;
-    }
-
-    setUploading(true);
-    setMessage("");
-    setError("");
-
-    try {
-      // Upload directly to Supabase (requires making supabase client available)
-      // For now, we'll use the API but with streaming
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      const blob = new Blob([arrayBuffer]);
-      
-      const response = await fetch("/api/uploadExcel", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/octet-stream",
-          "X-File-Name": selectedFile.name,
-        },
-        body: blob,
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessage(`✅ File uploaded successfully: ${data.fileName}`);
-        setSelectedFile(null);
-      } else {
-        setError(`❌ Error: ${data.error || data.details || "Upload failed"}`);
-      }
-    } catch (err: any) {
-      setError(`❌ Failed to upload file: ${err.message || "Please try again"}`);
-      console.error(err);
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -133,31 +90,30 @@ export default function ImportPage() {
           Upload Excel file and import Material, Actual Count, and Location data.
         </p>
 
-        {/* Upload Section */}
-        <div className="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">📤 Step 1: Upload Excel File</h2>
-          <div className="mb-4">
-            <input
-              type="file"
-              accept=".xlsx,.xlsm,.xls"
-              onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-              className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-            />
-          </div>
-          <button
-            onClick={handleFileUpload}
-            disabled={!selectedFile || uploading}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+        {/* Upload Instructions */}
+        <div className="mb-6 p-6 bg-amber-50 rounded-lg border border-amber-200">
+          <h2 className="text-xl font-semibold text-amber-900 mb-3">📤 Step 1: Upload Excel File to Supabase</h2>
+          <ol className="list-decimal list-inside text-amber-800 space-y-2 text-sm mb-4">
+            <li>Go to your Supabase Dashboard → Storage → "uploads" bucket</li>
+            <li>Click "Upload file" button</li>
+            <li>Select your Excel file and upload it</li>
+            <li>Rename the file to: <code className="bg-amber-100 px-2 py-1 rounded">Copy of Stock Inventory_29 Oct 2025.xlsm</code></li>
+          </ol>
+          <a 
+            href="https://supabase.com/dashboard" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-block bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
           >
-            {uploading ? "Uploading..." : "Upload File to Storage"}
-          </button>
+            Open Supabase Dashboard →
+          </a>
         </div>
 
         {/* Import Section */}
         <div className="p-6 bg-blue-50 rounded-lg border border-blue-200 mb-6">
           <h2 className="text-xl font-semibold text-blue-900 mb-4">📥 Step 2: Import Data to Database</h2>
           <p className="text-blue-800 text-sm mb-4">
-            After uploading the file, click below to import the data into the database.
+            After uploading the file to Supabase Storage, click below to import the data into the database.
             The file should have a "Master Data" sheet with Material, Actual Count, and Location columns.
           </p>
           <button
@@ -184,7 +140,7 @@ export default function ImportPage() {
         <div className="pt-6 border-t border-gray-200">
           <h3 className="font-semibold text-gray-900 mb-2">⚠️ Important Notes:</h3>
           <ul className="list-disc list-inside text-gray-600 space-y-1 text-sm">
-            <li>Upload will replace the existing Excel file in storage</li>
+            <li>The file name must be exactly: "Copy of Stock Inventory_29 Oct 2025.xlsm"</li>
             <li>Import will update existing records and add new ones to the database</li>
             <li>The import process may take a few seconds for large files</li>
             <li>After importing, all searches and queries will use this data</li>
