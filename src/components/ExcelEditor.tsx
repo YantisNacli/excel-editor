@@ -202,6 +202,7 @@ export default function ExcelEditor() {
 
     setIsSavingPartNumber(true);
     setShowSuggestions(false);
+    setSuggestions([]);
     try {
       // Get actual count from Excel
       const countRes = await fetch("/api/getActualCount", {
@@ -212,12 +213,19 @@ export default function ExcelEditor() {
 
       if (countRes.ok) {
         const data = await countRes.json();
+        
+        // Check if part number was found
+        if (data.actualCount === "Part number not found in inventory") {
+          alert("Part number not found in inventory. Please check and try again.");
+          setIsSavingPartNumber(false);
+          return;
+        }
+        
         setActualCount(data.actualCount);
+        setIsPartNumberSubmitted(true);
       } else {
-        setActualCount("Unable to fetch count");
+        alert("Unable to fetch count. Please try again.");
       }
-
-      setIsPartNumberSubmitted(true);
     } catch (error) {
       console.error("Error getting count:", error);
       alert("Error getting count");
