@@ -19,6 +19,7 @@ export default function ExcelEditor() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [actualCount, setActualCount] = useState<string>("");
   const [files, setFiles] = useState<FileData[]>([]);
   const [activeFile, setActiveFile] = useState<number | null>(null);
   const [activeSheet, setActiveSheet] = useState<number>(0);
@@ -210,27 +211,34 @@ export default function ExcelEditor() {
     setIsSavingPartNumber(true);
     setShowSuggestions(false);
     try {
-      // Prepare the current Excel data only if a file is active
-      let currentExcelData = null;
-      if (activeFile !== null) {
-        currentExcelData = [
-          columns.map((c) => c.name),
-          ...rows.map((r) => columns.map((c) => r[c.key] ?? "")),
-        ];
-      }
-
-      const res = await fetch("/api/saveName", {
+      // Save to database
+      const saveRes = await fetch("/api/saveName", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: userName, partNumber, excelData: currentExcelData }),
+        body: JSON.stringify({ name: userName, partNumber }),
       });
 
-      if (res.ok) {
-        setIsPartNumberSubmitted(true);
-      } else {
-        const errorData = await res.json();
+      if (!saveRes.ok) {
+        const errorData = await saveRes.json();
         alert(`Failed to save part number: ${errorData.error || 'Unknown error'}`);
+        return;
       }
+
+      // Get actual count from Excel
+      const countRes = await fetch("/api/getActualCount", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partNumber }),
+      });
+
+      if (countRes.ok) {
+        const data = await countRes.json();
+        setActualCount(data.actualCount);
+      } else {
+        setActualCount("Unable to fetch count");
+      }
+
+      setIsPartNumberSubmitted(true);
     } catch (error) {
       console.error("Error saving part number:", error);
       alert("Error saving part number");
@@ -339,6 +347,12 @@ export default function ExcelEditor() {
       <div className="mb-4 text-sm text-gray-900">
         Welcome, <span className="font-semibold">{userName}</span>! Part Number: <span className="font-semibold">{partNumber}</span>
       </div>
+      {actualCount && (
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h3 className="font-bold text-lg mb-2">Actual Count:</h3>
+          <p className="text-2xl font-semibold text-blue-700">{actualCount}</p>
+        </div>
+      )}
       <div className="mb-4">
         <label className="block mb-2">Upload Excel files (xlsx/xls)</label>
         <input type="file" multiple accept=".xlsx,.xls" onChange={onFileChange} />
