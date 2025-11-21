@@ -24,6 +24,11 @@ export default function ExcelEditor() {
   const [isQuantitySubmitted, setIsQuantitySubmitted] = useState(false);
   const [isSavingQuantity, setIsSavingQuantity] = useState(false);
   const [location, setLocation] = useState<string>("");
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchItems, setBatchItems] = useState<Array<{partNumber: string, quantity: string}>>([]);
+  const [currentBatchPart, setCurrentBatchPart] = useState<string>("");
+  const [currentBatchQty, setCurrentBatchQty] = useState<string>("");
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
   const [files, setFiles] = useState<FileData[]>([]);
   const [activeFile, setActiveFile] = useState<number | null>(null);
   const [activeSheet, setActiveSheet] = useState<number>(0);
@@ -326,7 +331,187 @@ export default function ExcelEditor() {
     );
   }
 
+  const handleAddToBatch = async () => {
+    if (!currentBatchPart.trim() || !currentBatchQty.trim()) return;
+
+    // Validate quantity format
+    const trimmed = currentBatchQty.trim();
+    const regex = /^[+-]\d+$/;
+    if (!regex.test(trimmed)) {
+      alert("Please enter a valid quantity format. Use +5 to add or -3 to remove.");
+      return;
+    }
+
+    // Validate part number exists
+    const countRes = await fetch("/api/getActualCount", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ partNumber: currentBatchPart }),
+    });
+
+    if (countRes.ok) {
+      const data = await countRes.json();
+      if (data.actualCount === "Part number not found in inventory") {
+        alert("Part number not found in inventory. Please check and try again.");
+        return;
+      }
+    }
+
+    // Add to batch
+    setBatchItems([...batchItems, { partNumber: currentBatchPart, quantity: currentBatchQty }]);
+    setCurrentBatchPart("");
+    setCurrentBatchQty("");
+    setShowSuggestions(false);
+  };
+
+  const handleRemoveFromBatch = (index: number) => {
+    setBatchItems(batchItems.filter((_, i) => i !== index));
+  };
+
+  const handleSubmitBatch = async () => {
+    if (batchItems.length === 0) return;
+
+    setIsProcessingBatch(true);
+    try {
+      // Process all items
+      for (const item of batchItems) {
+        // Save to database
+        await fetch("/api/saveName", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: userName, partNumber: item.partNumber, quantity: item.quantity }),
+        });
+
+        // Update Excel in background
+        fetch("/api/updateActualCount", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ partNumber: item.partNumber, quantityChange: item.quantity }),
+        }).catch(error => console.error("Failed to update Excel:", error));
+      }
+
+      alert(`Successfully processed ${batchItems.length} items!`);
+      setBatchMode(false);
+      setBatchItems([]);
+      setIsPartNumberSubmitted(true);
+      setIsQuantitySubmitted(true);
+    } catch (error) {
+      console.error("Error processing batch:", error);
+      alert("Error processing batch");
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
   if (!isPartNumberSubmitted) {
+    if (batchMode) {
+      return (
+        <div className="p-4">
+          <div className="max-w-2xl mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
+            <h2 className="text-xl font-bold mb-4">Batch Entry Mode</h2>
+            <p className="mb-4 text-sm text-gray-900">
+              Welcome, <span className="font-semibold">{userName}</span>! Add multiple items to process together.
+            </p>
+
+            {/* Current batch list */}
+            {batchItems.length > 0 && (
+              <div className="mb-4 p-3 bg-white border rounded">
+                <h3 className="font-semibold mb-2">Items to process ({batchItems.length}):</h3>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {batchItems.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                      <span className="text-sm">{item.partNumber} → {item.quantity}</span>
+                      <button
+                        onClick={() => handleRemoveFromBatch(index)}
+                        className="text-red-500 hover:text-red-700 text-sm font-semibold"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Add new item */}
+            <div className="mb-4">
+              <label className="block mb-2 font-semibold">Part Number:</label>
+              <div className="relative mb-3">
+                <input
+                  type="text"
+                  value={currentBatchPart}
+                  onChange={(e) => {
+                    setCurrentBatchPart(e.target.value);
+                    setShowSuggestions(true);
+                    searchPartNumbers(e.target.value);
+                  }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  placeholder="Enter part number"
+                  className="w-full px-3 py-2 border rounded"
+                />
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {suggestions.map((suggestion, index) => (
+                      <div
+                        key={index}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setCurrentBatchPart(suggestion);
+                          setShowSuggestions(false);
+                        }}
+                        className="px-3 py-2 hover:bg-blue-100 cursor-pointer border-b last:border-b-0"
+                      >
+                        {suggestion}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <label className="block mb-2 font-semibold">Quantity (+/-)</label>
+              <input
+                type="text"
+                value={currentBatchQty}
+                onChange={(e) => setCurrentBatchQty(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleAddToBatch();
+                  }
+                }}
+                placeholder="+5 or -3"
+                className="w-full px-3 py-2 border rounded mb-3"
+              />
+
+              <button
+                onClick={handleAddToBatch}
+                disabled={!currentBatchPart.trim() || !currentBatchQty.trim()}
+                className="w-full px-3 py-2 bg-green-500 text-white rounded font-semibold disabled:bg-gray-400"
+              >
+                Add to List
+              </button>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBatchMode(false)}
+                className="flex-1 px-3 py-2 bg-gray-500 text-white rounded font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitBatch}
+                disabled={batchItems.length === 0 || isProcessingBatch}
+                className="flex-1 px-3 py-2 bg-blue-500 text-white rounded font-semibold disabled:bg-gray-400"
+              >
+                {isProcessingBatch ? "Processing..." : `Submit All (${batchItems.length})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="p-4">
         <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
@@ -334,6 +519,17 @@ export default function ExcelEditor() {
           <p className="mb-4 text-sm text-gray-900">
             Welcome, <span className="font-semibold">{userName}</span>!
           </p>
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+            <p className="text-sm text-blue-900">
+              💡 <span className="font-semibold">Tip:</span> Need to process multiple items? 
+              <button 
+                onClick={() => setBatchMode(true)}
+                className="ml-2 text-blue-600 underline font-semibold"
+              >
+                Switch to Batch Mode
+              </button>
+            </p>
+          </div>
           <label className="block mb-2 font-semibold">What part number do you want to take out?</label>
           <div className="relative mb-4">
             <input
