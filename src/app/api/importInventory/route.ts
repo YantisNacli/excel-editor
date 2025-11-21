@@ -102,18 +102,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Extract data from Excel
-    const inventoryData: Array<{material: string, actual_count: number, location: string}> = [];
+    // Extract data from Excel and remove duplicates
+    const inventoryMap = new Map<string, {material: string, actual_count: number, location: string}>();
     
     for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
       const row = jsonData[i];
       const material = row[materialIndex];
       
       if (material && material.toString().trim() !== "") {
+        const materialKey = material.toString().trim().toLowerCase();
         const actualCount = row[actualCountIndex];
         const location = row[locationIndex];
         
-        inventoryData.push({
+        // Keep the last occurrence if there are duplicates
+        inventoryMap.set(materialKey, {
           material: material.toString().trim(),
           actual_count: (actualCount === undefined || actualCount === null || actualCount === "" || actualCount === 0) ? 0 : parseInt(actualCount.toString()),
           location: location ? location.toString().trim() : ""
@@ -121,9 +123,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (inventoryData.length === 0) {
+    if (inventoryMap.size === 0) {
       return NextResponse.json({ error: "No data found in Excel" }, { status: 400 });
     }
+
+    const inventoryData = Array.from(inventoryMap.values());
 
     // Upsert data in batches (Supabase has a limit on batch size)
     // This will update existing records and insert new ones
