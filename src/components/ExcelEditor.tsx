@@ -189,13 +189,13 @@ export default function ExcelEditor() {
 
   const handlePartNumberChange = (value: string) => {
     setPartNumber(value);
+    setShowSuggestions(true);
     searchPartNumbers(value);
   };
 
   const handleSelectSuggestion = (suggestion: string) => {
     setPartNumber(suggestion);
     setShowSuggestions(false);
-    setSuggestions([]);
   };
 
   const handleSubmitPartNumber = async () => {
@@ -348,11 +348,6 @@ export default function ExcelEditor() {
                 }
               }}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-              onFocus={() => {
-                if (suggestions.length > 0) {
-                  setShowSuggestions(true);
-                }
-              }}
               placeholder="Part number"
               className="w-full px-3 py-2 border rounded"
               autoFocus
