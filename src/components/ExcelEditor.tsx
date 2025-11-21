@@ -303,7 +303,16 @@ export default function ExcelEditor() {
     return (
       <div className="p-4">
         <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
-          <h2 className="text-xl font-bold mb-4">Welcome to Excel Editor</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Welcome to Excel Editor</h2>
+            <a
+              href="/import"
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
+              title="Import inventory data from Excel"
+            >
+              Import Data
+            </a>
+          </div>
           <label className="block mb-2 font-semibold">Please enter your name:</label>
           <input
             type="text"
