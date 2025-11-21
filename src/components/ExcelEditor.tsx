@@ -20,6 +20,9 @@ export default function ExcelEditor() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [actualCount, setActualCount] = useState<string>("");
+  const [newQuantity, setNewQuantity] = useState<string>("");
+  const [isQuantitySubmitted, setIsQuantitySubmitted] = useState(false);
+  const [isSavingQuantity, setIsSavingQuantity] = useState(false);
   const [files, setFiles] = useState<FileData[]>([]);
   const [activeFile, setActiveFile] = useState<number | null>(null);
   const [activeSheet, setActiveSheet] = useState<number>(0);
@@ -211,19 +214,6 @@ export default function ExcelEditor() {
     setIsSavingPartNumber(true);
     setShowSuggestions(false);
     try {
-      // Save to database
-      const saveRes = await fetch("/api/saveName", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: userName, partNumber }),
-      });
-
-      if (!saveRes.ok) {
-        const errorData = await saveRes.json();
-        alert(`Failed to save part number: ${errorData.error || 'Unknown error'}`);
-        return;
-      }
-
       // Get actual count from Excel
       const countRes = await fetch("/api/getActualCount", {
         method: "POST",
@@ -240,10 +230,37 @@ export default function ExcelEditor() {
 
       setIsPartNumberSubmitted(true);
     } catch (error) {
-      console.error("Error saving part number:", error);
-      alert("Error saving part number");
+      console.error("Error getting count:", error);
+      alert("Error getting count");
     } finally {
       setIsSavingPartNumber(false);
+    }
+  };
+
+  const handleSubmitQuantity = async () => {
+    if (!newQuantity.trim()) return;
+
+    setIsSavingQuantity(true);
+    try {
+      // Save to database with the new quantity
+      const saveRes = await fetch("/api/saveName", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: userName, partNumber }),
+      });
+
+      if (!saveRes.ok) {
+        const errorData = await saveRes.json();
+        alert(`Failed to save: ${errorData.error || 'Unknown error'}`);
+        return;
+      }
+
+      setIsQuantitySubmitted(true);
+    } catch (error) {
+      console.error("Error saving quantity:", error);
+      alert("Error saving quantity");
+    } finally {
+      setIsSavingQuantity(false);
     }
   };
 
@@ -335,7 +352,46 @@ export default function ExcelEditor() {
             disabled={!partNumber.trim() || isSavingPartNumber}
             className="w-full px-3 py-2 bg-blue-500 text-white rounded font-semibold disabled:bg-gray-400"
           >
-            {isSavingPartNumber ? "Saving..." : "Continue"}
+            {isSavingPartNumber ? "Loading..." : "Continue"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isQuantitySubmitted) {
+    return (
+      <div className="p-4">
+        <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
+          <h2 className="text-xl font-bold mb-4">Current Stock</h2>
+          <p className="mb-4 text-sm text-gray-900">
+            Part: <span className="font-semibold">{partNumber}</span>
+          </p>
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="font-bold text-lg mb-2">Current Actual Count:</h3>
+            <p className="text-2xl font-semibold text-blue-700">{actualCount}</p>
+          </div>
+          <label className="block mb-2 font-semibold">What is the new quantity in the box?</label>
+          <input
+            type="text"
+            value={newQuantity}
+            onChange={(e) => setNewQuantity(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newQuantity.trim() && !isSavingQuantity) {
+                handleSubmitQuantity();
+              }
+            }}
+            placeholder="New quantity"
+            className="w-full px-3 py-2 border rounded mb-4"
+            autoFocus
+            disabled={isSavingQuantity}
+          />
+          <button
+            onClick={handleSubmitQuantity}
+            disabled={!newQuantity.trim() || isSavingQuantity}
+            className="w-full px-3 py-2 bg-blue-500 text-white rounded font-semibold disabled:bg-gray-400"
+          >
+            {isSavingQuantity ? "Saving..." : "Continue"}
           </button>
         </div>
       </div>
@@ -347,12 +403,6 @@ export default function ExcelEditor() {
       <div className="mb-4 text-sm text-gray-900">
         Welcome, <span className="font-semibold">{userName}</span>! Part Number: <span className="font-semibold">{partNumber}</span>
       </div>
-      {actualCount && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h3 className="font-bold text-lg mb-2">Actual Count:</h3>
-          <p className="text-2xl font-semibold text-blue-700">{actualCount}</p>
-        </div>
-      )}
       <div className="mb-4">
         <label className="block mb-2">Upload Excel files (xlsx/xls)</label>
         <input type="file" multiple accept=".xlsx,.xls" onChange={onFileChange} />
