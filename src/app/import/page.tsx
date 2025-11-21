@@ -33,12 +33,18 @@ export default function ImportPage() {
     setError("");
 
     try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-
+      // Upload directly to Supabase (requires making supabase client available)
+      // For now, we'll use the API but with streaming
+      const arrayBuffer = await selectedFile.arrayBuffer();
+      const blob = new Blob([arrayBuffer]);
+      
       const response = await fetch("/api/uploadExcel", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-File-Name": selectedFile.name,
+        },
+        body: blob,
       });
 
       const data = await response.json();
@@ -47,10 +53,10 @@ export default function ImportPage() {
         setMessage(`✅ File uploaded successfully: ${data.fileName}`);
         setSelectedFile(null);
       } else {
-        setError(`❌ Error: ${data.error}`);
+        setError(`❌ Error: ${data.error || data.details || "Upload failed"}`);
       }
-    } catch (err) {
-      setError("❌ Failed to upload file. Please try again.");
+    } catch (err: any) {
+      setError(`❌ Failed to upload file: ${err.message || "Please try again"}`);
       console.error(err);
     } finally {
       setUploading(false);

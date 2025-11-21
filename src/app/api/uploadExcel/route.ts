@@ -8,15 +8,9 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const file = formData.get("file") as File;
-
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
+    const fileName = req.headers.get("X-File-Name") || "uploaded.xlsx";
+    
     // Check file extension
-    const fileName = file.name;
     const validExtensions = [".xlsx", ".xlsm", ".xls"];
     const hasValidExtension = validExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
 
@@ -27,8 +21,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Convert file to ArrayBuffer
-    const arrayBuffer = await file.arrayBuffer();
+    // Get file data as blob
+    const blob = await req.blob();
+    const arrayBuffer = await blob.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     // Use fixed filename for consistency
@@ -57,10 +52,10 @@ export async function POST(req: NextRequest) {
       message: "File uploaded successfully",
       fileName: uploadFileName
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in upload:", error);
     return NextResponse.json(
-      { error: "Failed to upload file" },
+      { error: "Failed to upload file", details: error.message },
       { status: 500 }
     );
   }
