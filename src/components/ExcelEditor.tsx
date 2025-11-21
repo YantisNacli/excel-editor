@@ -144,22 +144,11 @@ export default function ExcelEditor() {
     if (!userName.trim()) return;
     setIsSavingName(true);
     try {
-      // Save just the name to the backend
-      const res = await fetch("/api/saveNameOnly", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: userName }),
-      });
-
-      if (res.ok) {
-        setIsNameSubmitted(true);
-      } else {
-        const errorData = await res.json();
-        alert(`Failed to save name: ${errorData.error || 'Unknown error'}`);
-      }
+      // Just move to next question, don't save yet
+      setIsNameSubmitted(true);
     } catch (error) {
-      console.error("Error saving name:", error);
-      alert("Error saving name");
+      console.error("Error:", error);
+      alert("Error");
     } finally {
       setIsSavingName(false);
     }

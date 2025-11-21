@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 type DataRow = {
   id: number;
   date: string;
+  time: string;
   name: string;
   partNumber: string;
   quantity: string;
@@ -81,6 +82,7 @@ export default function ViewPage() {
               <thead className="bg-gray-100">
                 <tr>
                   <th className="px-4 py-2 border-b text-left">Date</th>
+                  <th className="px-4 py-2 border-b text-left">Time</th>
                   <th className="px-4 py-2 border-b text-left">Name</th>
                   <th className="px-4 py-2 border-b text-left">Part Number</th>
                   <th className="px-4 py-2 border-b text-left">Quantity</th>
@@ -90,7 +92,7 @@ export default function ViewPage() {
               <tbody>
                 {data.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-2 text-center text-gray-700">
+                    <td colSpan={6} className="px-4 py-2 text-center text-gray-700">
                       No data yet
                     </td>
                   </tr>
@@ -98,6 +100,7 @@ export default function ViewPage() {
                   data.map((row) => (
                     <tr key={row.id} className="hover:bg-gray-50">
                       <td className="px-4 py-2 border-b text-gray-900">{row.date}</td>
+                      <td className="px-4 py-2 border-b text-gray-900">{row.time}</td>
                       <td className="px-4 py-2 border-b text-gray-900">{row.name}</td>
                       <td className="px-4 py-2 border-b text-gray-900">{row.partNumber}</td>
                       <td className="px-4 py-2 border-b text-gray-900">{row.quantity}</td>

@@ -33,12 +33,19 @@ export async function GET(req: NextRequest) {
 
     // Format data for frontend
     const rows = (data || []).map(row => {
-      // Format created_at as date
-      const date = row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : "";
+      // Format created_at as date and time
+      let date = "";
+      let time = "";
+      if (row.created_at) {
+        const dateObj = new Date(row.created_at);
+        date = dateObj.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+        time = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      }
       
       return {
         id: row.id,
         date,
+        time,
         name: row.name || "",
         partNumber: row.part_number || "",
         quantity: row.quantity || "",
