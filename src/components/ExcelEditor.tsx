@@ -375,7 +375,7 @@ export default function ExcelEditor() {
     try {
       const locations: Array<{partNumber: string, location: string}> = [];
 
-      // Process all items
+      // Process all items - save to DB and get locations
       for (const item of batchItems) {
         // Save to database
         await fetch("/api/saveName", {
@@ -395,13 +395,15 @@ export default function ExcelEditor() {
           const data = await locRes.json();
           locations.push({ partNumber: item.partNumber, location: data.location });
         }
+      }
 
-        // Update Excel - wait for each to complete to avoid lock issues
-        await fetch("/api/updateActualCount", {
+      // Update Excel in background (don't wait)
+      for (const item of batchItems) {
+        fetch("/api/updateActualCount", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ partNumber: item.partNumber, quantityChange: item.quantity }),
-        });
+        }).catch(error => console.error("Failed to update Excel:", error));
       }
 
       // Store batch locations for display
