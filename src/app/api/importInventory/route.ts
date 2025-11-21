@@ -125,23 +125,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No data found in Excel" }, { status: 400 });
     }
 
-    // Clear existing inventory data
-    await supabase.from("inventory").delete().neq("material", "");
-
-    // Insert new data in batches (Supabase has a limit on batch size)
+    // Upsert data in batches (Supabase has a limit on batch size)
+    // This will update existing records and insert new ones
     const batchSize = 100;
     let imported = 0;
     
     for (let i = 0; i < inventoryData.length; i += batchSize) {
       const batch = inventoryData.slice(i, i + batchSize);
-      const { error: insertError } = await supabase
+      const { error: upsertError } = await supabase
         .from("inventory")
-        .insert(batch);
+        .upsert(batch, { onConflict: "material" });
       
-      if (insertError) {
-        console.error("Error inserting batch:", insertError);
+      if (upsertError) {
+        console.error("Error upserting batch:", upsertError);
         return NextResponse.json(
-          { error: "Failed to import data", details: insertError.message },
+          { error: "Failed to import data", details: upsertError.message },
           { status: 500 }
         );
       }
