@@ -16,6 +16,9 @@ export default function ExcelEditor() {
   const [isPartNumberSubmitted, setIsPartNumberSubmitted] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
   const [isSavingPartNumber, setIsSavingPartNumber] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [files, setFiles] = useState<FileData[]>([]);
   const [activeFile, setActiveFile] = useState<number | null>(null);
   const [activeSheet, setActiveSheet] = useState<number>(0);
@@ -158,10 +161,54 @@ export default function ExcelEditor() {
     }
   };
 
+  const searchPartNumbers = async (query: string) => {
+    if (!query.trim() || query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const res = await fetch("/api/searchPartNumbers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSuggestions(data.matches || []);
+        setShowSuggestions(data.matches.length > 0);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    } catch (error) {
+      console.error("Error searching part numbers:", error);
+      setSuggestions([]);
+      setShowSuggestions(false);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handlePartNumberChange = (value: string) => {
+    setPartNumber(value);
+    searchPartNumbers(value);
+  };
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    setPartNumber(suggestion);
+    setShowSuggestions(false);
+    setSuggestions([]);
+  };
+
   const handleSubmitPartNumber = async () => {
     if (!partNumber.trim()) return;
 
     setIsSavingPartNumber(true);
+    setShowSuggestions(false);
     try {
       // Prepare the current Excel data only if a file is active
       let currentExcelData = null;
@@ -233,20 +280,48 @@ export default function ExcelEditor() {
             Welcome, <span className="font-semibold">{userName}</span>!
           </p>
           <label className="block mb-2 font-semibold">What part number do you want to take out?</label>
-          <input
-            type="text"
-            value={partNumber}
-            onChange={(e) => setPartNumber(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && partNumber.trim() && !isSavingPartNumber) {
-                handleSubmitPartNumber();
-              }
-            }}
-            placeholder="Part number"
-            className="w-full px-3 py-2 border rounded mb-4"
-            autoFocus
-            disabled={isSavingPartNumber}
-          />
+          <div className="relative mb-4">
+            <input
+              type="text"
+              value={partNumber}
+              onChange={(e) => handlePartNumberChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && partNumber.trim() && !isSavingPartNumber) {
+                  handleSubmitPartNumber();
+                } else if (e.key === "Escape") {
+                  setShowSuggestions(false);
+                }
+              }}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              onFocus={() => {
+                if (suggestions.length > 0) {
+                  setShowSuggestions(true);
+                }
+              }}
+              placeholder="Part number"
+              className="w-full px-3 py-2 border rounded"
+              autoFocus
+              disabled={isSavingPartNumber}
+            />
+            {isSearching && (
+              <div className="absolute right-3 top-3 text-gray-500 text-sm">
+                Searching...
+              </div>
+            )}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {suggestions.map((suggestion, index) => (
+                  <div
+                    key={index}
+                    onClick={() => handleSelectSuggestion(suggestion)}
+                    className="px-3 py-2 hover:bg-blue-100 cursor-pointer border-b last:border-b-0"
+                  >
+                    {suggestion}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             onClick={handleSubmitPartNumber}
             disabled={!partNumber.trim() || isSavingPartNumber}
