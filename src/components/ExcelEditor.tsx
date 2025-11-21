@@ -23,6 +23,7 @@ export default function ExcelEditor() {
   const [newQuantity, setNewQuantity] = useState<string>("");
   const [isQuantitySubmitted, setIsQuantitySubmitted] = useState(false);
   const [isSavingQuantity, setIsSavingQuantity] = useState(false);
+  const [location, setLocation] = useState<string>("");
   const [files, setFiles] = useState<FileData[]>([]);
   const [activeFile, setActiveFile] = useState<number | null>(null);
   const [activeSheet, setActiveSheet] = useState<number>(0);
@@ -252,6 +253,20 @@ export default function ExcelEditor() {
         return;
       }
 
+      // Get location from Excel
+      const locRes = await fetch("/api/getLocation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partNumber }),
+      });
+
+      if (locRes.ok) {
+        const data = await locRes.json();
+        setLocation(data.location);
+      } else {
+        setLocation("Unable to fetch location");
+      }
+
       setIsQuantitySubmitted(true);
     } catch (error) {
       console.error("Error saving quantity:", error);
@@ -398,10 +413,23 @@ export default function ExcelEditor() {
 
   return (
     <div className="p-4">
-      <div className="mb-4 text-sm text-gray-900">
-        Welcome, <span className="font-semibold">{userName}</span>! Part Number: <span className="font-semibold">{partNumber}</span>
-      </div>
-      <div className="mb-4">
+      {location && (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="max-w-2xl w-full p-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl shadow-2xl">
+            <h2 className="text-3xl font-bold text-white text-center mb-6">Location</h2>
+            <div className="bg-white rounded-xl p-8 text-center">
+              <p className="text-6xl font-black text-gray-900 break-words">{location}</p>
+            </div>
+            <p className="text-white text-center mt-6 text-lg">Part: {partNumber}</p>
+          </div>
+        </div>
+      )}
+      {!location && (
+        <>
+          <div className="mb-4 text-sm text-gray-900">
+            Welcome, <span className="font-semibold">{userName}</span>! Part Number: <span className="font-semibold">{partNumber}</span>
+          </div>
+          <div className="mb-4">
         <label className="block mb-2">Upload Excel files (xlsx/xls)</label>
         <input type="file" multiple accept=".xlsx,.xls" onChange={onFileChange} />
       </div>
@@ -447,6 +475,8 @@ export default function ExcelEditor() {
             <DataGrid columns={columns} rows={rows} onRowsChange={setRows} />
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
