@@ -48,23 +48,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ matches: [] });
     }
 
-    // Assume first row is headers
-    const headers = jsonData[0] as string[];
+    // Find the header row by looking for "Material" column in the first 10 rows
+    let headerRowIndex = -1;
+    let partNumberIndex = -1;
     
-    // Find the "Material" column (case-insensitive search)
-    const partNumberIndex = headers.findIndex((h) =>
-      h && h.toString().toLowerCase().includes("material")
-    );
+    for (let i = 0; i < Math.min(10, jsonData.length); i++) {
+      const row = jsonData[i] as any[];
+      const materialIndex = row.findIndex((cell) =>
+        cell && cell.toString().toLowerCase().includes("material")
+      );
+      
+      if (materialIndex !== -1) {
+        headerRowIndex = i;
+        partNumberIndex = materialIndex;
+        break;
+      }
+    }
 
-    if (partNumberIndex === -1) {
-      // Debug: Return available sheet names and column headers
+    if (headerRowIndex === -1 || partNumberIndex === -1) {
+      // Debug: Return available sheet names and column headers from first few rows
       return NextResponse.json(
         { 
           error: "Material column not found", 
           debug: {
             availableSheets: workbook.SheetNames,
             selectedSheet: sheetName,
-            availableColumns: headers
+            first5Rows: jsonData.slice(0, 5)
           }
         },
         { status: 400 }
@@ -76,7 +85,7 @@ export async function POST(req: NextRequest) {
     const matches: string[] = [];
     const seen = new Set<string>();
 
-    for (let i = 1; i < jsonData.length; i++) {
+    for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
       const row = jsonData[i];
       const partNumber = row[partNumberIndex];
       
