@@ -7,10 +7,47 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// In-memory queue to handle concurrent updates
-let updateQueue: Promise<any> = Promise.resolve();
+const MAX_RETRIES = 10;
+const RETRY_DELAY = 500; // ms
+
+async function acquireLock(): Promise<boolean> {
+  const lockId = "excel_update_lock";
+  const { data, error } = await supabase
+    .from("stock_data")
+    .select("id")
+    .eq("name", lockId)
+    .maybeSingle();
+
+  if (data) {
+    return false; // Lock already exists
+  }
+
+  // Try to create the lock
+  const { error: insertError } = await supabase
+    .from("stock_data")
+    .insert({ 
+      name: lockId, 
+      part_number: "LOCK", 
+      quantity: new Date().toISOString() 
+    });
+
+  return !insertError;
+}
+
+async function releaseLock(): Promise<void> {
+  await supabase
+    .from("stock_data")
+    .delete()
+    .eq("name", "excel_update_lock");
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 export async function POST(req: NextRequest) {
+  let lockAcquired = false;
+  
   try {
     const { partNumber, quantityChange } = await req.json();
 
@@ -30,28 +67,23 @@ export async function POST(req: NextRequest) {
 
     const fileName = "Copy of Stock Inventory_29 Oct 2025.xlsm";
 
-    // Add this update to the queue
-    const result = await new Promise<NextResponse>((resolve) => {
-      updateQueue = updateQueue
-        .then(async () => {
-          try {
-            const response = await performUpdate(partNumber, change, fileName);
-            resolve(response);
-          } catch (error) {
-            resolve(NextResponse.json(
-              { error: "Failed to update" },
-              { status: 500 }
-            ));
-          }
-        })
-        .catch(() => {
-          resolve(NextResponse.json(
-            { error: "Queue error" },
-            { status: 500 }
-          ));
-        });
-    });
+    // Try to acquire lock with retries
+    for (let i = 0; i < MAX_RETRIES; i++) {
+      lockAcquired = await acquireLock();
+      if (lockAcquired) break;
+      await sleep(RETRY_DELAY);
+    }
 
+    if (!lockAcquired) {
+      return NextResponse.json(
+        { error: "System busy, please try again" },
+        { status: 503 }
+      );
+    }
+
+    // Perform the update
+    const result = await performUpdate(partNumber, change, fileName);
+    
     return result;
   } catch (error) {
     console.error("Error updating actual count:", error);
@@ -59,6 +91,10 @@ export async function POST(req: NextRequest) {
       { error: "Failed to update actual count" },
       { status: 500 }
     );
+  } finally {
+    if (lockAcquired) {
+      await releaseLock();
+    }
   }
 }
 
