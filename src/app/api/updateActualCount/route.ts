@@ -84,6 +84,10 @@ export async function POST(req: NextRequest) {
     // Perform the update
     const result = await performUpdate(partNumber, change, fileName);
     
+    // Explicitly release lock before returning
+    await releaseLock();
+    lockAcquired = false; // Mark as released
+    
     return result;
   } catch (error) {
     console.error("Error updating actual count:", error);
@@ -92,8 +96,14 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   } finally {
+    // Ensure lock is always released
     if (lockAcquired) {
-      await releaseLock();
+      try {
+        await releaseLock();
+        console.log("Lock released in finally block");
+      } catch (releaseError) {
+        console.error("Error releasing lock:", releaseError);
+      }
     }
   }
 }

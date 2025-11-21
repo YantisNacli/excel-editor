@@ -373,6 +373,8 @@ export default function ExcelEditor() {
 
     setIsProcessingBatch(true);
     try {
+      const locations: Array<{partNumber: string, location: string}> = [];
+
       // Process all items
       for (const item of batchItems) {
         // Save to database
@@ -382,19 +384,34 @@ export default function ExcelEditor() {
           body: JSON.stringify({ name: userName, partNumber: item.partNumber, quantity: item.quantity }),
         });
 
-        // Update Excel in background
-        fetch("/api/updateActualCount", {
+        // Get location
+        const locRes = await fetch("/api/getLocation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ partNumber: item.partNumber }),
+        });
+
+        if (locRes.ok) {
+          const data = await locRes.json();
+          locations.push({ partNumber: item.partNumber, location: data.location });
+        }
+
+        // Update Excel - wait for each to complete to avoid lock issues
+        await fetch("/api/updateActualCount", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ partNumber: item.partNumber, quantityChange: item.quantity }),
-        }).catch(error => console.error("Failed to update Excel:", error));
+        });
       }
 
-      alert(`Successfully processed ${batchItems.length} items!`);
-      setBatchMode(false);
+      // Store batch locations for display
       setBatchItems([]);
       setIsPartNumberSubmitted(true);
       setIsQuantitySubmitted(true);
+      
+      // Create location summary
+      const locationSummary = locations.map(l => `${l.partNumber}: ${l.location}`).join("\n");
+      setLocation(locationSummary);
     } catch (error) {
       console.error("Error processing batch:", error);
       alert("Error processing batch");
@@ -628,11 +645,25 @@ export default function ExcelEditor() {
       {location && (
         <div className="flex items-center justify-center min-h-screen">
           <div className="max-w-2xl w-full p-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl shadow-2xl">
-            <h2 className="text-3xl font-bold text-white text-center mb-6">Location</h2>
-            <div className="bg-white rounded-xl p-8 text-center">
-              <p className="text-6xl font-black text-gray-900 break-words">{location}</p>
+            <h2 className="text-3xl font-bold text-white text-center mb-6">
+              {location.includes("\n") ? "Locations" : "Location"}
+            </h2>
+            <div className="bg-white rounded-xl p-8">
+              {location.includes("\n") ? (
+                <div className="space-y-3">
+                  {location.split("\n").map((line, idx) => (
+                    <div key={idx} className="p-3 bg-gray-50 rounded">
+                      <p className="text-2xl font-bold text-gray-900">{line}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-6xl font-black text-gray-900 break-words text-center">{location}</p>
+              )}
             </div>
-            <p className="text-white text-center mt-6 text-lg">Part: {partNumber}</p>
+            {!location.includes("\n") && partNumber && (
+              <p className="text-white text-center mt-6 text-lg">Part: {partNumber}</p>
+            )}
           </div>
         </div>
       )}
