@@ -262,18 +262,7 @@ export default function ExcelEditor() {
         return;
       }
 
-      // Update the actual count in Excel
-      const updateRes = await fetch("/api/updateActualCount", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ partNumber, quantityChange: newQuantity }),
-      });
-
-      if (!updateRes.ok) {
-        console.error("Failed to update Excel file");
-      }
-
-      // Get location from Excel
+      // Get location from Excel first (fast)
       const locRes = await fetch("/api/getLocation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -288,6 +277,15 @@ export default function ExcelEditor() {
       }
 
       setIsQuantitySubmitted(true);
+
+      // Update the actual count in Excel in the background (slow)
+      fetch("/api/updateActualCount", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partNumber, quantityChange: newQuantity }),
+      }).catch(error => {
+        console.error("Failed to update Excel file:", error);
+      });
     } catch (error) {
       console.error("Error saving quantity:", error);
       alert("Error saving quantity");
