@@ -112,7 +112,15 @@ export default function ViewPage() {
     <div className="p-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Stock Tracker</h1>
+          <div className="flex items-center gap-4">
+            <a
+              href="/"
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-semibold"
+            >
+              ← Back
+            </a>
+            <h1 className="text-2xl font-bold">Stock Tracker</h1>
+          </div>
           <button
             onClick={fetchData}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"

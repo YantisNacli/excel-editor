@@ -675,6 +675,12 @@ export default function ExcelEditor() {
             {!location.includes("\n") && partNumber && (
               <p className="text-white text-center mt-6 text-lg">Part: {partNumber}</p>
             )}
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full mt-6 px-6 py-3 bg-white text-blue-700 font-bold rounded-xl hover:bg-gray-100 transition-colors"
+            >
+              ← Start New Entry
+            </button>
           </div>
         </div>
       )}
