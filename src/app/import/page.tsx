@@ -164,29 +164,29 @@ export default function ImportPage() {
           <button
             onClick={handleImport}
             disabled={importing}
-        {/* Export Section */}
-        <div className="p-6 bg-green-50 rounded-lg border border-green-200 mt-6">
-          <h2 className="text-xl font-semibold text-green-900 mb-4">📥 Step 3: Export Current Inventory</h2>
-          <p className="text-green-800 text-sm mb-4">
-            Download the current inventory data from the database as an Excel file:
-          </p>
-          <button
-            onClick={handleExport}
-            disabled={isExporting}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
           >
-            {isExporting ? "Exporting..." : "Export to Excel"}
+            {importing ? "Importing..." : "Import Inventory Data"}
           </button>
-          {exportMessage && (
-            <p className={`mt-4 font-medium ${exportMessage.includes("Error") ? "text-red-800" : "text-green-800"}`}>
-              {exportMessage}
-            </p>
-          )}
         </div>
-      </div>
-    </div>
-  );
-}           <li>Import will update existing records and add new ones to the database</li>
+
+        {message && (
+          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-green-800 font-medium">{message}</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-800 font-medium">{error}</p>
+          </div>
+        )}
+
+        <div className="pt-6 border-t border-gray-200">
+          <h3 className="font-semibold text-gray-900 mb-2">⚠️ Important Notes:</h3>
+          <ul className="list-disc list-inside text-gray-600 space-y-1 text-sm">
+            <li>The file name must be exactly: "Copy of Stock Inventory_29 Oct 2025.xlsm"</li>
+            <li>Import will update existing records and add new ones to the database</li>
             <li>The import process may take a few seconds for large files</li>
             <li>After importing, all searches and queries will use this data</li>
           </ul>
@@ -208,20 +208,20 @@ export default function ImportPage() {
         </div>
 
         {/* Export Section */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Export Inventory Data</h2>
-          <p className="text-gray-600 mb-4">
-            Download the current inventory data as an Excel file:
+        <div className="p-6 bg-green-50 rounded-lg border border-green-200 mt-6">
+          <h2 className="text-xl font-semibold text-green-900 mb-4">📥 Step 3: Export Current Inventory</h2>
+          <p className="text-green-800 text-sm mb-4">
+            Download the current inventory data from the database as an Excel file:
           </p>
           <button
             onClick={handleExport}
             disabled={isExporting}
-            className="bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
           >
             {isExporting ? "Exporting..." : "Export to Excel"}
           </button>
           {exportMessage && (
-            <p className={`mt-4 ${exportMessage.includes("Error") ? "text-red-600" : "text-green-600"}`}>
+            <p className={`mt-4 font-medium ${exportMessage.includes("Error") ? "text-red-800" : "text-green-800"}`}>
               {exportMessage}
             </p>
           )}
