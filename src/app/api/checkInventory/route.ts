@@ -14,17 +14,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Material is required" }, { status: 400 });
     }
 
-    // Query inventory table
+    // Query inventory table with case-insensitive exact match
     const { data, error } = await supabase
       .from("inventory")
       .select("material, actual_count, location")
-      .ilike("material", material)
+      .ilike("material", material.trim())
       .maybeSingle();
 
     if (error) {
       console.error("Error querying inventory:", error);
+      console.error("Error details:", JSON.stringify(error));
       return NextResponse.json(
-        { error: "Failed to check inventory" },
+        { error: "Failed to check inventory", details: error.message },
         { status: 500 }
       );
     }

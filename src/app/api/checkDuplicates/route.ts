@@ -17,18 +17,27 @@ export async function POST(req: NextRequest) {
     // Get all materials from the batch
     const materials = items.map(item => item.material.toLowerCase());
 
-    // Check which ones already exist
-    const { data: existingItems, error } = await supabase
-      .from("inventory")
-      .select("material, actual_count, location")
-      .in("material", materials);
-
-    if (error) {
-      console.error("Error checking duplicates:", error);
-      return NextResponse.json(
-        { error: "Failed to check duplicates" },
-        { status: 500 }
-      );
+    // Check which ones already exist - use ilike for case-insensitive matching
+    let existingItems: any[] = [];
+    
+    for (const material of materials) {
+      const { data, error } = await supabase
+        .from("inventory")
+        .select("material, actual_count, location")
+        .ilike("material", material);
+      
+      if (error) {
+        console.error("Error checking duplicates:", error);
+        console.error("Error details:", JSON.stringify(error));
+        return NextResponse.json(
+          { error: "Failed to check duplicates", details: error.message },
+          { status: 500 }
+        );
+      }
+      
+      if (data && data.length > 0) {
+        existingItems.push(data[0]);
+      }
     }
 
     // Create a map of existing items for easy lookup
