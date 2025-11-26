@@ -121,12 +121,20 @@ export default function ViewPage() {
             </a>
             <h1 className="text-2xl font-bold">Stock Tracker</h1>
           </div>
-          <button
-            onClick={fetchData}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Refresh
-          </button>
+          <div className="flex gap-2">
+            <a
+              href="/manage"
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold"
+            >
+              Manage Inventory
+            </a>
+            <button
+              onClick={fetchData}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* Filter Section */}
