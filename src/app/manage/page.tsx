@@ -22,6 +22,9 @@ export default function ManagePage() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [duplicateData, setDuplicateData] = useState<Array<{ material: string; newData: any; oldData: any }>>([]);
+  const [pendingBatchItems, setPendingBatchItems] = useState<BatchItem[]>([]);
 
   const handleAddToBatch = () => {
     if (!currentMaterial.trim() || !currentLocation.trim()) {
@@ -57,17 +60,48 @@ export default function ManagePage() {
     setMessage("");
 
     try {
-      const response = await fetch("/api/addInventoryBatch", {
+      // First, check for duplicates
+      const checkResponse = await fetch("/api/checkDuplicates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: batchItems }),
       });
 
+      const checkData = await checkResponse.json();
+
+      if (checkResponse.ok && checkData.hasDuplicates) {
+        // Show confirmation dialog
+        setDuplicateData(checkData.duplicates);
+        setPendingBatchItems(batchItems);
+        setShowDuplicateDialog(true);
+        setIsProcessing(false);
+        return;
+      }
+
+      // No duplicates, proceed with normal add
+      await submitBatchToDatabase(batchItems);
+    } catch (err) {
+      setError("❌ Failed to check items. Please try again.");
+      console.error(err);
+      setIsProcessing(false);
+    }
+  };
+
+  const submitBatchToDatabase = async (items: BatchItem[]) => {
+    setIsProcessing(true);
+    try {
+      const response = await fetch("/api/addInventoryBatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
+
       const data = await response.json();
 
       if (response.ok) {
-        setMessage(`✅ Successfully added ${data.added} items to inventory`);
+        setMessage(`✅ Successfully added/updated ${data.added} items to inventory`);
         setBatchItems([]);
+        setPendingBatchItems([]);
       } else {
         setError(`❌ Error: ${data.error}`);
       }
@@ -77,6 +111,19 @@ export default function ManagePage() {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleConfirmReplace = async () => {
+    setShowDuplicateDialog(false);
+    await submitBatchToDatabase(pendingBatchItems);
+  };
+
+  const handleCancelReplace = () => {
+    setShowDuplicateDialog(false);
+    setDuplicateData([]);
+    setPendingBatchItems([]);
+    setIsProcessing(false);
+    setMessage("❌ Operation cancelled. No changes made.");
   };
 
   const searchPartNumbers = async (query: string) => {
@@ -394,6 +441,66 @@ export default function ManagePage() {
         {error && (
           <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-800 font-medium">{error}</p>
+          </div>
+        )}
+
+        {/* Duplicate Confirmation Dialog */}
+        {showDuplicateDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">⚠️ Duplicate Items Found</h2>
+                <p className="text-gray-700 mb-4">
+                  The following items already exist in the inventory. Do you want to replace the old data with the new data?
+                </p>
+                
+                <div className="space-y-4 mb-6">
+                  {duplicateData.map((dup, idx) => (
+                    <div key={idx} className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                      <h3 className="font-bold text-lg text-gray-900 mb-3">{dup.material}</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Old Data */}
+                        <div className="bg-red-50 border border-red-200 rounded p-3">
+                          <h4 className="font-semibold text-red-900 mb-2">Current Data (Old)</h4>
+                          <p className="text-sm text-gray-700">
+                            <span className="font-medium">Count:</span> {dup.oldData.actual_count}
+                          </p>
+                          <p className="text-sm text-gray-700">
+                            <span className="font-medium">Location:</span> {dup.oldData.location || "N/A"}
+                          </p>
+                        </div>
+                        
+                        {/* New Data */}
+                        <div className="bg-green-50 border border-green-200 rounded p-3">
+                          <h4 className="font-semibold text-green-900 mb-2">New Data</h4>
+                          <p className="text-sm text-gray-700">
+                            <span className="font-medium">Count:</span> {dup.newData.actual_count}
+                          </p>
+                          <p className="text-sm text-gray-700">
+                            <span className="font-medium">Location:</span> {dup.newData.location || "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-4">
+                  <button
+                    onClick={handleCancelReplace}
+                    className="flex-1 py-3 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 font-bold"
+                  >
+                    ❌ No, Keep Old Data
+                  </button>
+                  <button
+                    onClick={handleConfirmReplace}
+                    className="flex-1 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold"
+                  >
+                    ✅ Yes, Replace with New Data
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

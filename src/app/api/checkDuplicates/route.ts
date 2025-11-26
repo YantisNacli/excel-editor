@@ -1,0 +1,63 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function POST(req: NextRequest) {
+  try {
+    const { items } = await req.json();
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ error: "No items provided" }, { status: 400 });
+    }
+
+    // Get all materials from the batch
+    const materials = items.map(item => item.material.toLowerCase());
+
+    // Check which ones already exist
+    const { data: existingItems, error } = await supabase
+      .from("inventory")
+      .select("material, actual_count, location")
+      .in("material", materials);
+
+    if (error) {
+      console.error("Error checking duplicates:", error);
+      return NextResponse.json(
+        { error: "Failed to check duplicates" },
+        { status: 500 }
+      );
+    }
+
+    // Create a map of existing items for easy lookup
+    const existingMap = new Map(
+      (existingItems || []).map(item => [item.material.toLowerCase(), item])
+    );
+
+    // Find duplicates
+    const duplicates = items
+      .filter(item => existingMap.has(item.material.toLowerCase()))
+      .map(item => ({
+        material: item.material,
+        newData: {
+          actual_count: item.actual_count,
+          location: item.location
+        },
+        oldData: existingMap.get(item.material.toLowerCase())
+      }));
+
+    return NextResponse.json({
+      hasDuplicates: duplicates.length > 0,
+      duplicates: duplicates,
+      newItems: items.filter(item => !existingMap.has(item.material.toLowerCase()))
+    });
+  } catch (error) {
+    console.error("Error checking duplicates:", error);
+    return NextResponse.json(
+      { error: "Failed to check duplicates" },
+      { status: 500 }
+    );
+  }
+}
