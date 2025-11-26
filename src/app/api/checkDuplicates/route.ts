@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No items provided" }, { status: 400 });
     }
 
-    // Get all materials from the batch
-    const materials = items.map(item => item.material.toLowerCase());
+    // Get all materials from the batch and normalize to uppercase
+    const materials = items.map(item => item.material.trim().toUpperCase());
 
     // Check which ones already exist - use ilike for case-insensitive matching
     let existingItems: any[] = [];
@@ -40,27 +40,27 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Create a map of existing items for easy lookup
+    // Create a map of existing items for easy lookup (using uppercase keys)
     const existingMap = new Map(
-      (existingItems || []).map(item => [item.material.toLowerCase(), item])
+      (existingItems || []).map(item => [item.material.toUpperCase(), item])
     );
 
     // Find duplicates
     const duplicates = items
-      .filter(item => existingMap.has(item.material.toLowerCase()))
+      .filter(item => existingMap.has(item.material.trim().toUpperCase()))
       .map(item => ({
         material: item.material,
         newData: {
           actual_count: item.actual_count,
           location: item.location
         },
-        oldData: existingMap.get(item.material.toLowerCase())
+        oldData: existingMap.get(item.material.trim().toUpperCase())
       }));
 
     return NextResponse.json({
       hasDuplicates: duplicates.length > 0,
       duplicates: duplicates,
-      newItems: items.filter(item => !existingMap.has(item.material.toLowerCase()))
+      newItems: items.filter(item => !existingMap.has(item.material.trim().toUpperCase()))
     });
   } catch (error) {
     console.error("Error checking duplicates:", error);

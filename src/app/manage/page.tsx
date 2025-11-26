@@ -33,9 +33,10 @@ export default function ManagePage() {
     }
 
     const count = parseInt(currentCount) || 0;
+    const normalizedMaterial = currentMaterial.trim().toUpperCase();
 
     setBatchItems([...batchItems, {
-      material: currentMaterial.trim(),
+      material: normalizedMaterial,
       actual_count: count,
       location: currentLocation.trim()
     }]);
@@ -44,7 +45,7 @@ export default function ManagePage() {
     setCurrentCount("");
     setCurrentLocation("");
     setError("");
-    setMessage(`✅ Added ${currentMaterial} to batch`);
+    setMessage(`✅ Added ${normalizedMaterial} to batch`);
     setTimeout(() => setMessage(""), 2000);
   };
 

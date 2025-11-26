@@ -14,11 +14,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Material is required" }, { status: 400 });
     }
 
+    // Normalize material to uppercase for consistent matching
+    const normalizedMaterial = material.trim().toUpperCase();
+
     // Query inventory table with case-insensitive exact match
     const { data, error } = await supabase
       .from("inventory")
       .select("material, actual_count, location")
-      .ilike("material", material.trim())
+      .ilike("material", normalizedMaterial)
       .maybeSingle();
 
     if (error) {
