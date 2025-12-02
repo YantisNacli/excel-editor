@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { DataGrid, type Column } from "react-data-grid";
 
@@ -35,6 +35,15 @@ export default function ExcelEditor() {
   const [useHeader, setUseHeader] = useState(true);
   const [columns, setColumns] = useState<Column<Row>[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
+
+  // Load saved username from localStorage on mount
+  useEffect(() => {
+    const savedName = localStorage.getItem('stockTrackerUserName');
+    if (savedName) {
+      setUserName(savedName);
+      setIsNameSubmitted(true);
+    }
+  }, []);
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputFiles = e.target.files;
@@ -150,6 +159,8 @@ export default function ExcelEditor() {
     if (!userName.trim()) return;
     setIsSavingName(true);
     try {
+      // Save username to localStorage
+      localStorage.setItem('stockTrackerUserName', userName.trim());
       // Just move to next question, don't save yet
       setIsNameSubmitted(true);
     } catch (error) {
@@ -436,7 +447,27 @@ export default function ExcelEditor() {
       return (
         <div className="p-4">
           <div className="max-w-2xl mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
-            <h2 className="text-xl font-bold mb-4">Batch Entry Mode</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Batch Entry Mode</h2>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('stockTrackerUserName');
+                  setUserName("");
+                  setIsNameSubmitted(false);
+                  setPartNumber("");
+                  setIsPartNumberSubmitted(false);
+                  setNewQuantity("");
+                  setIsQuantitySubmitted(false);
+                  setLocation("");
+                  setActualCount("");
+                  setBatchMode(false);
+                  setBatchItems([]);
+                }}
+                className="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+              >
+                Change User
+              </button>
+            </div>
             <p className="mb-4 text-sm text-gray-900">
               Welcome, <span className="font-semibold">{userName}</span>! Add multiple items to process together.
             </p>
@@ -543,7 +574,25 @@ export default function ExcelEditor() {
     return (
       <div className="p-4">
         <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
-          <h2 className="text-xl font-bold mb-4">Part Number</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Part Number</h2>
+            <button
+              onClick={() => {
+                localStorage.removeItem('stockTrackerUserName');
+                setUserName("");
+                setIsNameSubmitted(false);
+                setPartNumber("");
+                setIsPartNumberSubmitted(false);
+                setNewQuantity("");
+                setIsQuantitySubmitted(false);
+                setLocation("");
+                setActualCount("");
+              }}
+              className="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+            >
+              Change User
+            </button>
+          </div>
           <p className="mb-4 text-sm text-gray-900">
             Welcome, <span className="font-semibold">{userName}</span>!
           </p>
@@ -676,7 +725,15 @@ export default function ExcelEditor() {
               <p className="text-white text-center mt-6 text-lg">Part: {partNumber}</p>
             )}
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                // Reset to part number question (keep username)
+                setPartNumber("");
+                setIsPartNumberSubmitted(false);
+                setNewQuantity("");
+                setIsQuantitySubmitted(false);
+                setLocation("");
+                setActualCount("");
+              }}
               className="w-full mt-6 px-6 py-3 bg-white text-blue-700 font-bold rounded-xl hover:bg-gray-100 transition-colors"
             >
               ← Start New Entry
