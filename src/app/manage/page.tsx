@@ -9,7 +9,7 @@ type BatchItem = {
 };
 
 export default function ManagePage() {
-  const [mode, setMode] = useState<"add" | "check">("add");
+  const [mode, setMode] = useState<"add" | "check" | "delete">("add");
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [currentMaterial, setCurrentMaterial] = useState("");
   const [currentCount, setCurrentCount] = useState("");
@@ -25,6 +25,7 @@ export default function ManagePage() {
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [duplicateData, setDuplicateData] = useState<Array<{ material: string; newData: any; oldData: any }>>([]);
   const [pendingBatchItems, setPendingBatchItems] = useState<BatchItem[]>([]);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ material: string; actual_count: number; location: string } | null>(null);
 
   const handleAddToBatch = () => {
     if (!currentMaterial.trim() || !currentLocation.trim()) {
@@ -127,6 +128,73 @@ export default function ManagePage() {
     setMessage("❌ Operation cancelled. No changes made.");
   };
 
+  const handleSearchForDelete = async () => {
+    if (!currentMaterial.trim()) {
+      setError("Please enter a material/part number");
+      return;
+    }
+
+    setIsProcessing(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/checkInventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ material: currentMaterial }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setDeleteConfirmation(data);
+        setCurrentMaterial("");
+        setShowSuggestions(false);
+      } else {
+        setError(`❌ ${data.error || "Part not found"}`);
+      }
+    } catch (err) {
+      setError("❌ Failed to search for part. Please try again.");
+      console.error(err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmation) return;
+
+    setIsProcessing(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/deleteInventoryItem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ material: deleteConfirmation.material }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage(`✅ Successfully deleted ${deleteConfirmation.material}`);
+        setDeleteConfirmation(null);
+      } else {
+        setError(`❌ Error: ${data.error}`);
+      }
+    } catch (err) {
+      setError("❌ Failed to delete item. Please try again.");
+      console.error(err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteConfirmation(null);
+    setMessage("❌ Deletion cancelled.");
+  };
+
   const searchPartNumbers = async (query: string) => {
     if (query.length < 2) {
       setSuggestions([]);
@@ -227,7 +295,7 @@ export default function ManagePage() {
         {/* Mode Toggle */}
         <div className="mb-6 flex gap-2">
           <button
-            onClick={() => { setMode("add"); setError(""); setCheckResult(null); }}
+            onClick={() => { setMode("add"); setError(""); setCheckResult(null); setDeleteConfirmation(null); }}
             className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
               mode === "add"
                 ? "bg-blue-600 text-white"
@@ -237,7 +305,7 @@ export default function ManagePage() {
             ➕ Add New Parts
           </button>
           <button
-            onClick={() => { setMode("check"); setError(""); setMessage(""); setCheckBatchItems([]); }}
+            onClick={() => { setMode("check"); setError(""); setMessage(""); setCheckBatchItems([]); setDeleteConfirmation(null); }}
             className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
               mode === "check"
                 ? "bg-green-600 text-white"
@@ -245,6 +313,16 @@ export default function ManagePage() {
             }`}
           >
             🔍 Check Existing Parts
+          </button>
+          <button
+            onClick={() => { setMode("delete"); setError(""); setMessage(""); setCheckBatchItems([]); setDeleteConfirmation(null); }}
+            className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
+              mode === "delete"
+                ? "bg-red-600 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            🗑️ Delete Parts
           </button>
         </div>
 
@@ -432,10 +510,102 @@ export default function ManagePage() {
           </div>
         )}
 
+        {/* Delete Mode */}
+        {mode === "delete" && (
+          <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">Delete Parts from Inventory</h2>
+            <p className="text-sm text-red-600 mb-4">
+              ⚠️ Warning: This will permanently delete the part from the inventory database.
+            </p>
+            
+            <div className="mb-4 relative">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Material/Part Number
+              </label>
+              <input
+                type="text"
+                value={currentMaterial}
+                onChange={(e) => handleMaterialChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && currentMaterial.trim() && !isProcessing) {
+                    handleSearchForDelete();
+                  }
+                }}
+                placeholder="Search part to delete"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                autoFocus
+              />
+              
+              {/* Autocomplete Dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  {suggestions.map((suggestion, idx) => (
+                    <div
+                      key={idx}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        selectSuggestion(suggestion);
+                      }}
+                      className="px-3 py-2 hover:bg-blue-100 cursor-pointer text-gray-900"
+                    >
+                      {suggestion}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleSearchForDelete}
+              disabled={isProcessing || !currentMaterial.trim()}
+              className="w-full py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 font-semibold mb-6"
+            >
+              {isProcessing ? "Searching..." : "Search to Delete"}
+            </button>
+
+            {deleteConfirmation && (
+              <div className="bg-white p-4 rounded-lg border-2 border-red-500 shadow-sm">
+                <h3 className="text-lg font-bold text-red-900 mb-4">Confirm Deletion</h3>
+                <div className="mb-4">
+                  <p className="text-xl font-bold text-gray-900 mb-2">{deleteConfirmation.material}</p>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-600">Actual Count:</span>
+                      <p className="text-lg font-bold text-blue-600">{deleteConfirmation.actual_count}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Location:</span>
+                      <p className="text-lg font-bold text-green-600">{deleteConfirmation.location || "Not specified"}</p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-red-700 text-sm mb-4">
+                  Are you sure you want to delete this part? This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCancelDelete}
+                    className="flex-1 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmDelete}
+                    disabled={isProcessing}
+                    className="flex-1 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 font-semibold"
+                  >
+                    {isProcessing ? "Deleting..." : "Confirm Delete"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Messages */}
         {message && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-green-800 font-medium">{message}</p>
+          <div className=\"mt-4 p-4 bg-green-50 border border-green-200 rounded-lg\">
+            <p className=\"text-green-800 font-medium\">{message}</p>
           </div>
         )}
 
