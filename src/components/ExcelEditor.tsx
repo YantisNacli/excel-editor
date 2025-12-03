@@ -11,6 +11,7 @@ type FileData = { name: string; sheets: SheetData[] };
 
 export default function ExcelEditor() {
   const [userName, setUserName] = useState<string>("");
+  const [userRole, setUserRole] = useState<string>("operator");
   const [isNameSubmitted, setIsNameSubmitted] = useState(false);
   const [partNumber, setPartNumber] = useState<string>("");
   const [isPartNumberSubmitted, setIsPartNumberSubmitted] = useState(false);
@@ -41,6 +42,20 @@ export default function ExcelEditor() {
     const savedName = localStorage.getItem('stockTrackerUserName');
     if (savedName) {
       setUserName(savedName);
+      // Fetch user role from database
+      fetch('/api/getUser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: savedName }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.role) {
+            setUserRole(data.role);
+            localStorage.setItem('stockTrackerUserRole', data.role);
+          }
+        })
+        .catch(err => console.error('Error fetching user role:', err));
       setIsNameSubmitted(true);
     }
   }, []);
@@ -159,13 +174,27 @@ export default function ExcelEditor() {
     if (!userName.trim()) return;
     setIsSavingName(true);
     try {
-      // Save username to localStorage
-      localStorage.setItem('stockTrackerUserName', userName.trim());
-      // Just move to next question, don't save yet
-      setIsNameSubmitted(true);
+      // Fetch user role from database
+      const response = await fetch('/api/getUser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: userName.trim() }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.role) {
+        setUserRole(data.role);
+        // Save username and role to localStorage
+        localStorage.setItem('stockTrackerUserName', userName.trim());
+        localStorage.setItem('stockTrackerUserRole', data.role);
+        setIsNameSubmitted(true);
+      } else {
+        alert('Failed to get user role. Please try again.');
+      }
     } catch (error) {
       console.error("Error:", error);
-      alert("Error");
+      alert("Error fetching user information");
     } finally {
       setIsSavingName(false);
     }
@@ -452,7 +481,9 @@ export default function ExcelEditor() {
               <button
                 onClick={() => {
                   localStorage.removeItem('stockTrackerUserName');
+                  localStorage.removeItem('stockTrackerUserRole');
                   setUserName("");
+                  setUserRole("operator");
                   setIsNameSubmitted(false);
                   setPartNumber("");
                   setIsPartNumberSubmitted(false);
@@ -469,7 +500,9 @@ export default function ExcelEditor() {
               </button>
             </div>
             <p className="mb-4 text-sm text-gray-900">
-              Welcome, <span className="font-semibold">{userName}</span>! Add multiple items to process together.
+              Welcome, <span className="font-semibold">{userName}</span>!{\" \"}
+              <span className={`inline-block px-2 py-1 text-xs font-semibold rounded ${\n                userRole === \"admin\" ? \"bg-purple-200 text-purple-800\" :\n                userRole === \"operator\" ? \"bg-blue-200 text-blue-800\" :\n                \"bg-gray-200 text-gray-800\"\n              }`}>\n                {userRole.toUpperCase()}\n              </span>
+              <br />Add multiple items to process together.
             </p>
 
             {/* Current batch list */}
@@ -551,6 +584,13 @@ export default function ExcelEditor() {
             </div>
 
             {/* Action buttons */}
+            {userRole === "viewer" && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded">
+                <p className="text-sm text-yellow-800">
+                  ⚠️ <span className="font-semibold">View-only access:</span> You don't have permission to submit transactions.
+                </p>
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={() => setBatchMode(false)}
@@ -560,10 +600,10 @@ export default function ExcelEditor() {
               </button>
               <button
                 onClick={handleSubmitBatch}
-                disabled={batchItems.length === 0 || isProcessingBatch}
+                disabled={batchItems.length === 0 || isProcessingBatch || userRole === "viewer"}
                 className="flex-1 px-3 py-2 bg-blue-500 text-white rounded font-semibold disabled:bg-gray-400"
               >
-                {isProcessingBatch ? "Processing..." : `Submit All (${batchItems.length})`}
+                {isProcessingBatch ? "Processing..." : userRole === "viewer" ? "View-only (No Access)" : `Submit All (${batchItems.length})`}
               </button>
             </div>
           </div>
@@ -579,7 +619,9 @@ export default function ExcelEditor() {
             <button
               onClick={() => {
                 localStorage.removeItem('stockTrackerUserName');
+                localStorage.removeItem('stockTrackerUserRole');
                 setUserName("");
+                setUserRole("operator");
                 setIsNameSubmitted(false);
                 setPartNumber("");
                 setIsPartNumberSubmitted(false);
@@ -594,7 +636,8 @@ export default function ExcelEditor() {
             </button>
           </div>
           <p className="mb-4 text-sm text-gray-900">
-            Welcome, <span className="font-semibold">{userName}</span>!
+            Welcome, <span className="font-semibold">{userName}</span>!{\" \"}
+            <span className={`inline-block px-2 py-1 text-xs font-semibold rounded ${\n              userRole === \"admin\" ? \"bg-purple-200 text-purple-800\" :\n              userRole === \"operator\" ? \"bg-blue-200 text-blue-800\" :\n              \"bg-gray-200 text-gray-800\"\n            }`}>\n              {userRole.toUpperCase()}\n            </span>
           </p>
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
             <p className="text-sm text-blue-900">
@@ -688,12 +731,19 @@ export default function ExcelEditor() {
             autoFocus
             disabled={isSavingQuantity}
           />
+          {userRole === "viewer" && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded">
+              <p className="text-sm text-yellow-800">
+                ⚠️ <span className="font-semibold">View-only access:</span> You don't have permission to submit transactions.
+              </p>
+            </div>
+          )}
           <button
             onClick={handleSubmitQuantity}
-            disabled={!newQuantity.trim() || isSavingQuantity}
+            disabled={!newQuantity.trim() || isSavingQuantity || userRole === "viewer"}
             className="w-full px-3 py-2 bg-blue-500 text-white rounded font-semibold disabled:bg-gray-400"
           >
-            {isSavingQuantity ? "Saving..." : "Continue"}
+            {isSavingQuantity ? "Saving..." : userRole === "viewer" ? "View-only (No Access)" : "Continue"}
           </button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 type BatchItem = {
   material: string;
@@ -10,6 +10,8 @@ type BatchItem = {
 
 export default function ManagePage() {
   const [mode, setMode] = useState<"add" | "check" | "delete">("add");
+  const [userRole, setUserRole] = useState<string>("");
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [currentMaterial, setCurrentMaterial] = useState("");
   const [currentCount, setCurrentCount] = useState("");
@@ -234,6 +236,13 @@ export default function ManagePage() {
     setShowSuggestions(false);
   };
 
+  useEffect(() => {
+    // Check user role from localStorage
+    const role = localStorage.getItem('stockTrackerUserRole');
+    setUserRole(role || "");
+    setCheckingAuth(false);
+  }, []);
+
   const handleAddToCheckBatch = async () => {
     if (!currentMaterial.trim()) {
       setError("Please enter a material/part number");
@@ -276,6 +285,41 @@ export default function ManagePage() {
   const handleClearCheckBatch = () => {
     setCheckBatchItems([]);
   };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    );
+  }
+
+  if (userRole !== "admin" && userRole !== "operator") {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-red-50 border border-red-200 rounded-xl p-8 text-center">
+          <h1 className="text-2xl font-bold text-red-900 mb-4">🚫 Access Denied</h1>
+          <p className="text-red-800 mb-6">
+            You need operator or admin privileges to manage inventory.
+          </p>
+          <div className="flex gap-4">
+            <a
+              href="/"
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold text-center"
+            >
+              ← Go Home
+            </a>
+            <a
+              href="/view"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-center"
+            >
+              View Records
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white p-4">
