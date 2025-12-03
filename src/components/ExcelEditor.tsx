@@ -500,8 +500,14 @@ export default function ExcelEditor() {
               </button>
             </div>
             <p className="mb-4 text-sm text-gray-900">
-              Welcome, <span className="font-semibold">{userName}</span>!{\" \"}
-              <span className={`inline-block px-2 py-1 text-xs font-semibold rounded ${\n                userRole === \"admin\" ? \"bg-purple-200 text-purple-800\" :\n                userRole === \"operator\" ? \"bg-blue-200 text-blue-800\" :\n                \"bg-gray-200 text-gray-800\"\n              }`}>\n                {userRole.toUpperCase()}\n              </span>
+              Welcome, <span className="font-semibold">{userName}</span>!{" "}
+              <span className={`inline-block px-2 py-1 text-xs font-semibold rounded ${
+                userRole === "admin" ? "bg-purple-200 text-purple-800" :
+                userRole === "operator" ? "bg-blue-200 text-blue-800" :
+                "bg-gray-200 text-gray-800"
+              }`}>
+                {userRole.toUpperCase()}
+              </span>
               <br />Add multiple items to process together.
             </p>
 
@@ -636,8 +642,14 @@ export default function ExcelEditor() {
             </button>
           </div>
           <p className="mb-4 text-sm text-gray-900">
-            Welcome, <span className="font-semibold">{userName}</span>!{\" \"}
-            <span className={`inline-block px-2 py-1 text-xs font-semibold rounded ${\n              userRole === \"admin\" ? \"bg-purple-200 text-purple-800\" :\n              userRole === \"operator\" ? \"bg-blue-200 text-blue-800\" :\n              \"bg-gray-200 text-gray-800\"\n            }`}>\n              {userRole.toUpperCase()}\n            </span>
+            Welcome, <span className="font-semibold">{userName}</span>!{" "}
+            <span className={`inline-block px-2 py-1 text-xs font-semibold rounded ${
+              userRole === "admin" ? "bg-purple-200 text-purple-800" :
+              userRole === "operator" ? "bg-blue-200 text-blue-800" :
+              "bg-gray-200 text-gray-800"
+            }`}>
+              {userRole.toUpperCase()}
+            </span>
           </p>
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
             <p className="text-sm text-blue-900">
