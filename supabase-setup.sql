@@ -24,14 +24,15 @@ CREATE POLICY "Allow all access to inventory" ON inventory
 -- Create users table for role-based access control
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('viewer', 'operator', 'admin')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create index on username for faster lookups
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+-- Create index on email for faster lookups
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- Enable Row Level Security for users table
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -42,10 +43,10 @@ CREATE POLICY "Allow all access to users" ON users
   USING (true)
   WITH CHECK (true);
 
--- Insert a default admin user
-INSERT INTO users (username, role) 
-VALUES ('admin', 'admin')
-ON CONFLICT (username) DO NOTHING;
+-- Insert a default admin user (change email to your email)
+INSERT INTO users (email, name, role) 
+VALUES ('admin@example.com', 'Admin User', 'admin')
+ON CONFLICT (email) DO NOTHING;
 
 -- Role descriptions:
 -- 'viewer'   - Can only view records and inventory, no modifications

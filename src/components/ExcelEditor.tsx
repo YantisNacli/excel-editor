@@ -10,12 +10,14 @@ type SheetData = { name: string; arr: any[][] };
 type FileData = { name: string; sheets: SheetData[] };
 
 export default function ExcelEditor() {
+  const [userEmail, setUserEmail] = useState<string>("");
   const [userName, setUserName] = useState<string>("");
-  const [userRole, setUserRole] = useState<string>("operator");
-  const [isNameSubmitted, setIsNameSubmitted] = useState(false);
+  const [userRole, setUserRole] = useState<string>("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [authError, setAuthError] = useState<string>("");
   const [partNumber, setPartNumber] = useState<string>("");
   const [isPartNumberSubmitted, setIsPartNumberSubmitted] = useState(false);
-  const [isSavingName, setIsSavingName] = useState(false);
   const [isSavingPartNumber, setIsSavingPartNumber] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -37,27 +39,53 @@ export default function ExcelEditor() {
   const [columns, setColumns] = useState<Column<Row>[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
 
-  // Load saved username from localStorage on mount
+  // Auto-authenticate user on mount
   useEffect(() => {
-    const savedName = localStorage.getItem('stockTrackerUserName');
-    if (savedName) {
-      setUserName(savedName);
-      // Fetch user role from database
-      fetch('/api/getUser', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: savedName }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.role) {
-            setUserRole(data.role);
-            localStorage.setItem('stockTrackerUserRole', data.role);
+    const authenticateUser = async () => {
+      try {
+        // Try to get email from localStorage
+        let email = localStorage.getItem('stockTrackerUserEmail');
+        
+        if (!email) {
+          // Prompt user for email on first visit
+          email = prompt("Enter your email address to access the system:");
+          if (!email) {
+            setAuthError("Email is required to access the system.");
+            setIsCheckingAuth(false);
+            return;
           }
-        })
-        .catch(err => console.error('Error fetching user role:', err));
-      setIsNameSubmitted(true);
-    }
+        }
+
+        // Fetch user from database
+        const response = await fetch('/api/getUser', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim() }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.role) {
+          setUserEmail(data.email);
+          setUserName(data.name);
+          setUserRole(data.role);
+          setIsAuthenticated(true);
+          localStorage.setItem('stockTrackerUserEmail', data.email);
+          localStorage.setItem('stockTrackerUserName', data.name);
+          localStorage.setItem('stockTrackerUserRole', data.role);
+        } else {
+          setAuthError(data.error || "Access denied. Your email is not authorized.");
+          localStorage.removeItem('stockTrackerUserEmail');
+        }
+      } catch (error) {
+        console.error('Auth error:', error);
+        setAuthError("Failed to authenticate. Please try again.");
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    authenticateUser();
   }, []);
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,34 +198,11 @@ export default function ExcelEditor() {
     }
   };
 
-  const handleSubmitName = async () => {
-    if (!userName.trim()) return;
-    setIsSavingName(true);
-    try {
-      // Fetch user role from database
-      const response = await fetch('/api/getUser', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: userName.trim() }),
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok && data.role) {
-        setUserRole(data.role);
-        // Save username and role to localStorage
-        localStorage.setItem('stockTrackerUserName', userName.trim());
-        localStorage.setItem('stockTrackerUserRole', data.role);
-        setIsNameSubmitted(true);
-      } else {
-        alert('Failed to get user role. Please try again.');
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      alert("Error fetching user information");
-    } finally {
-      setIsSavingName(false);
-    }
+  const handleChangeUser = () => {
+    localStorage.removeItem('stockTrackerUserEmail');
+    localStorage.removeItem('stockTrackerUserName');
+    localStorage.removeItem('stockTrackerUserRole');
+    window.location.reload();
   };
 
   const searchPartNumbers = async (query: string) => {
@@ -339,41 +344,37 @@ export default function ExcelEditor() {
     }
   };
 
-  if (!isNameSubmitted) {
+  // Show loading or auth error
+  if (isCheckingAuth) {
     return (
       <div className="p-4">
         <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Welcome to Excel Editor</h2>
-            <a
-              href="/import"
-              className="text-sm text-blue-600 hover:text-blue-800 underline"
-              title="Import inventory data from Excel"
-            >
-              Import Data
-            </a>
+          <div className="text-center">
+            <h2 className="text-xl font-bold mb-4">Authenticating...</h2>
+            <p className="text-gray-600">Please wait while we verify your access.</p>
           </div>
-          <label className="block mb-2 font-semibold">Please enter your name:</label>
-          <input
-            type="text"
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && userName.trim() && !isSavingName) {
-                handleSubmitName();
-              }
-            }}
-            placeholder="Your name"
-            className="w-full px-3 py-2 border rounded mb-4"
-            autoFocus
-            disabled={isSavingName}
-          />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || authError) {
+    return (
+      <div className="p-4">
+        <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-red-50 border-red-300">
+          <h2 className="text-xl font-bold mb-4 text-red-800">Access Denied</h2>
+          <p className="mb-4 text-red-700">{authError || "Your email is not authorized to access this system."}</p>
+          <p className="text-sm text-gray-700 mb-4">
+            Please contact your administrator to request access.
+          </p>
           <button
-            onClick={handleSubmitName}
-            disabled={!userName.trim() || isSavingName}
-            className="w-full px-3 py-2 bg-blue-500 text-white rounded font-semibold disabled:bg-gray-400"
+            onClick={() => {
+              localStorage.removeItem('stockTrackerUserEmail');
+              window.location.reload();
+            }}
+            className="w-full px-3 py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700"
           >
-            {isSavingName ? "Saving..." : "Continue"}
+            Try Different Email
           </button>
         </div>
       </div>
@@ -623,19 +624,7 @@ export default function ExcelEditor() {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">Part Number</h2>
             <button
-              onClick={() => {
-                localStorage.removeItem('stockTrackerUserName');
-                localStorage.removeItem('stockTrackerUserRole');
-                setUserName("");
-                setUserRole("operator");
-                setIsNameSubmitted(false);
-                setPartNumber("");
-                setIsPartNumberSubmitted(false);
-                setNewQuantity("");
-                setIsQuantitySubmitted(false);
-                setLocation("");
-                setActualCount("");
-              }}
+              onClick={handleChangeUser}
               className="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
             >
               Change User

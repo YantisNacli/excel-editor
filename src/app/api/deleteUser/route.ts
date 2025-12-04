@@ -8,20 +8,20 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { username } = await req.json();
+    const { email } = await req.json();
 
-    if (!username || typeof username !== "string") {
-      return NextResponse.json({ error: "Username is required" }, { status: 400 });
+    if (!email || typeof email !== "string") {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    // Normalize username to lowercase
-    const normalizedUsername = username.trim().toLowerCase();
+    // Normalize email to lowercase
+    const normalizedEmail = email.trim().toLowerCase();
 
     // Delete user from users table
     const { error } = await supabase
       .from("users")
       .delete()
-      .ilike("username", normalizedUsername);
+      .ilike("email", normalizedEmail);
 
     if (error) {
       console.error("Error deleting user:", error);
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ 
       message: "User deleted successfully",
-      username: normalizedUsername
+      email: normalizedEmail
     });
   } catch (error) {
     console.error("Error deleting user:", error);

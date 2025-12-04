@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 
 type User = {
   id: string;
-  username: string;
+  email: string;
+  name: string;
   role: string;
   created_at: string;
   updated_at: string;
@@ -17,11 +18,16 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newRole, setNewRole] = useState("operator");
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     // Check if user is admin
     const userRole = localStorage.getItem('stockTrackerUserRole');
-    const username = localStorage.getItem('stockTrackerUserName');
+    const userEmail = localStorage.getItem('stockTrackerUserEmail');
     
     if (userRole === 'admin') {
       setIsAdmin(true);
@@ -51,7 +57,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleUpdateRole = async (username: string, newRole: string) => {
+  const handleUpdateRole = async (email: string, newRole: string) => {
     setMessage("");
     setError("");
 
@@ -59,13 +65,13 @@ export default function AdminPage() {
       const response = await fetch("/api/updateUserRole", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, newRole }),
+        body: JSON.stringify({ email, newRole }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setMessage(`✅ Updated ${username} to ${newRole}`);
+        setMessage(`✅ Updated ${email} to ${newRole}`);
         fetchUsers();
         setTimeout(() => setMessage(""), 3000);
       } else {
@@ -77,8 +83,8 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteUser = async (username: string) => {
-    if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
+  const handleDeleteUser = async (email: string) => {
+    if (!confirm(`Are you sure you want to delete user "${email}"?`)) {
       return;
     }
 
@@ -89,13 +95,13 @@ export default function AdminPage() {
       const response = await fetch("/api/deleteUser", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ email }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setMessage(`✅ Deleted user ${username}`);
+        setMessage(`✅ Deleted user ${email}`);
         fetchUsers();
         setTimeout(() => setMessage(""), 3000);
       } else {
@@ -104,6 +110,49 @@ export default function AdminPage() {
     } catch (err) {
       setError("❌ Failed to delete user");
       console.error(err);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage("");
+    setError("");
+
+    if (!newEmail.trim() || !newName.trim()) {
+      setError("❌ Email and name are required");
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const response = await fetch("/api/createUser", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          email: newEmail.trim(), 
+          name: newName.trim(), 
+          role: newRole 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage(`✅ Created user ${newEmail} (${newName})`);
+        setShowCreateForm(false);
+        setNewEmail("");
+        setNewName("");
+        setNewRole("operator");
+        fetchUsers();
+        setTimeout(() => setMessage(""), 3000);
+      } else {
+        setError(`❌ ${data.error}`);
+      }
+    } catch (err) {
+      setError("❌ Failed to create user");
+      console.error(err);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -179,11 +228,67 @@ export default function AdminPage() {
         <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">All Users ({users.length})</h2>
-            <div className="flex gap-2 text-xs">
-              <span className="px-2 py-1 bg-gray-200 text-gray-800 rounded font-semibold">VIEWER = Read-only</span>
-              <span className="px-2 py-1 bg-blue-200 text-blue-800 rounded font-semibold">OPERATOR = Transactions</span>
-              <span className="px-2 py-1 bg-purple-200 text-purple-800 rounded font-semibold">ADMIN = Full Access</span>
-            </div>
+            <button
+              onClick={() => setShowCreateForm(!showCreateForm)}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold"
+            >
+              {showCreateForm ? "Cancel" : "+ Add User"}
+            </button>
+          </div>
+
+          {showCreateForm && (
+            <form onSubmit={handleCreateUser} className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+              <h3 className="text-lg font-semibold mb-4 text-green-900">Create New User</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-1 text-gray-700">Email</label>
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="user@example.com"
+                    className="w-full px-3 py-2 border rounded"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1 text-gray-700">Name</label>
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="John Doe"
+                    className="w-full px-3 py-2 border rounded"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1 text-gray-700">Role</label>
+                  <select
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                    className="w-full px-3 py-2 border rounded"
+                  >
+                    <option value="viewer">Viewer</option>
+                    <option value="operator">Operator</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={isCreating}
+                className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold disabled:bg-gray-400"
+              >
+                {isCreating ? "Creating..." : "Create User"}
+              </button>
+            </form>
+          )}
+
+          <div className="mb-4 flex gap-2 text-xs">
+            <span className="px-2 py-1 bg-gray-200 text-gray-800 rounded font-semibold">VIEWER = Read-only</span>
+            <span className="px-2 py-1 bg-blue-200 text-blue-800 rounded font-semibold">OPERATOR = Transactions</span>
+            <span className="px-2 py-1 bg-purple-200 text-purple-800 rounded font-semibold">ADMIN = Full Access</span>
           </div>
 
           {loading ? (
@@ -196,7 +301,10 @@ export default function AdminPage() {
                 <div key={user.id} className="bg-white p-4 rounded-lg border border-gray-300 flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
-                      <p className="text-lg font-bold text-gray-900">{user.username}</p>
+                      <div>
+                        <p className="text-lg font-bold text-gray-900">{user.name}</p>
+                        <p className="text-sm text-gray-600">{user.email}</p>
+                      </div>
                       <span className={`px-2 py-1 text-xs font-semibold rounded ${
                         user.role === "admin" ? "bg-purple-200 text-purple-800" :
                         user.role === "operator" ? "bg-blue-200 text-blue-800" :
@@ -205,7 +313,7 @@ export default function AdminPage() {
                         {user.role.toUpperCase()}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       Created: {new Date(user.created_at).toLocaleDateString()}
                     </p>
                   </div>
@@ -213,7 +321,7 @@ export default function AdminPage() {
                   <div className="flex gap-2">
                     <select
                       value={user.role}
-                      onChange={(e) => handleUpdateRole(user.username, e.target.value)}
+                      onChange={(e) => handleUpdateRole(user.email, e.target.value)}
                       className="px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="viewer">Viewer</option>
@@ -222,7 +330,7 @@ export default function AdminPage() {
                     </select>
 
                     <button
-                      onClick={() => handleDeleteUser(user.username)}
+                      onClick={() => handleDeleteUser(user.email)}
                       className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 text-sm font-semibold"
                     >
                       Delete
@@ -242,7 +350,7 @@ export default function AdminPage() {
             <li><strong>Admin:</strong> Full access including user management, inventory management, imports, and all operator functions.</li>
           </ul>
           <p className="mt-4 text-xs text-blue-700">
-            💡 New users are automatically created as "Operator" when they first log in.
+            ⚠️ Only users with whitelisted emails can access the system. Use the "Add User" button to authorize new users.
           </p>
         </div>
       </div>

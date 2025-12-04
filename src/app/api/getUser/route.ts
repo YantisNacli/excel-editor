@@ -8,20 +8,26 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { username } = await req.json();
+    const { email } = await req.json();
 
-    if (!username || typeof username !== "string") {
-      return NextResponse.json({ error: "Username is required" }, { status: 400 });
+    if (!email || typeof email !== "string") {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    // Normalize username to lowercase for consistent lookups
-    const normalizedUsername = username.trim().toLowerCase();
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
+    }
+
+    // Normalize email to lowercase for consistent lookups
+    const normalizedEmail = email.trim().toLowerCase();
 
     // Query users table
     const { data, error } = await supabase
       .from("users")
-      .select("username, role, created_at")
-      .ilike("username", normalizedUsername)
+      .select("email, name, role, created_at")
+      .ilike("email", normalizedEmail)
       .maybeSingle();
 
     if (error) {
@@ -33,30 +39,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (!data) {
-      // User not found - create as operator by default
-      const { data: newUser, error: createError } = await supabase
-        .from("users")
-        .insert([{ username: normalizedUsername, role: "operator" }])
-        .select("username, role, created_at")
-        .single();
-
-      if (createError) {
-        console.error("Error creating user:", createError);
-        return NextResponse.json(
-          { error: "Failed to create user" },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({
-        username: newUser.username,
-        role: newUser.role,
-        isNewUser: true
-      });
+      // User not found - deny access
+      return NextResponse.json(
+        { error: "Email not authorized. Please contact an administrator." },
+        { status: 403 }
+      );
     }
 
     return NextResponse.json({
-      username: data.username,
+      email: data.email,
+      name: data.name,
       role: data.role,
       isNewUser: false
     });

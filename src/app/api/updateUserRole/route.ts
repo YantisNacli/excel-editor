@@ -8,11 +8,11 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { username, newRole } = await req.json();
+    const { email, newRole } = await req.json();
 
-    if (!username || !newRole) {
+    if (!email || !newRole) {
       return NextResponse.json(
-        { error: "Username and role are required" },
+        { error: "Email and role are required" },
         { status: 400 }
       );
     }
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabase
       .from("users")
       .update({ role: newRole, updated_at: new Date().toISOString() })
-      .ilike("username", username.trim().toLowerCase())
+      .ilike("email", email.trim().toLowerCase())
       .select()
       .single();
 
