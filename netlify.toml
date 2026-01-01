@@ -1,26 +1,6 @@
 [build]
   command = "npm run build"
-  publish = ".next"
   node_version = "20"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
-
-# Force webpack (disable Turbopack) so Netlify can generate API functions
-[context.production.environment]
-  NEXT_DISABLE_TURBOPACK = "1"
-
-[context.deploy-preview.environment]
-  NEXT_DISABLE_TURBOPACK = "1"
-
-# Ensure Next.js API routes map to generated Netlify functions
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/next_api_:splat"
-  status = 200
-
-# Explicit mapping for app router API route naming (common on Netlify)
-[[redirects]]
-  from = "/api/login"
-  to   = "/.netlify/functions/app_api_login"
-  status = 200
