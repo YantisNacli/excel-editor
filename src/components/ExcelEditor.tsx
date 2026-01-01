@@ -1,8 +1,9 @@
 ﻿"use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import { DataGrid, type Column } from "react-data-grid";
+import { scanPartNumbersFromBlob, scanPartNumbersFromCanvas } from "../lib/textScan";
 
 type Row = { id: number; [key: string]: any };
 
@@ -16,7 +17,14 @@ export default function ExcelEditor() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [authError, setAuthError] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState<string>("");
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [partNumber, setPartNumber] = useState<string>("");
+  const [isNameSubmitted, setIsNameSubmitted] = useState(false);
   const [isPartNumberSubmitted, setIsPartNumberSubmitted] = useState(false);
   const [isSavingPartNumber, setIsSavingPartNumber] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -32,6 +40,13 @@ export default function ExcelEditor() {
   const [currentBatchPart, setCurrentBatchPart] = useState<string>("");
   const [currentBatchQty, setCurrentBatchQty] = useState<string>("");
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isScanningImage, setIsScanningImage] = useState(false);
+  const [scanResults, setScanResults] = useState<string[]>([]);
+  const [scanError, setScanError] = useState<string>("");
   const [files, setFiles] = useState<FileData[]>([]);
   const [activeFile, setActiveFile] = useState<number | null>(null);
   const [activeSheet, setActiveSheet] = useState<number>(0);
@@ -41,52 +56,148 @@ export default function ExcelEditor() {
 
   // Auto-authenticate user on mount
   useEffect(() => {
-    const authenticateUser = async () => {
-      try {
-        // Try to get email from localStorage
-        let email = localStorage.getItem('stockTrackerUserEmail');
-        
-        if (!email) {
-          // Prompt user for email on first visit
-          email = prompt("Enter your email address to access the system:");
-          if (!email) {
-            setAuthError("Email is required to access the system.");
-            setIsCheckingAuth(false);
-            return;
-          }
-        }
+    const checkExistingSession = () => {
+      const sessionToken = localStorage.getItem('stockTrackerSessionToken');
+      const email = localStorage.getItem('stockTrackerUserEmail');
+      const name = localStorage.getItem('stockTrackerUserName');
+      const role = localStorage.getItem('stockTrackerUserRole');
 
-        // Fetch user from database
-        const response = await fetch('/api/getUser', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim() }),
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.role) {
-          setUserEmail(data.email);
-          setUserName(data.name);
-          setUserRole(data.role);
-          setIsAuthenticated(true);
-          localStorage.setItem('stockTrackerUserEmail', data.email);
-          localStorage.setItem('stockTrackerUserName', data.name);
-          localStorage.setItem('stockTrackerUserRole', data.role);
-        } else {
-          setAuthError(data.error || "Access denied. Your email is not authorized.");
-          localStorage.removeItem('stockTrackerUserEmail');
-        }
-      } catch (error) {
-        console.error('Auth error:', error);
-        setAuthError("Failed to authenticate. Please try again.");
-      } finally {
-        setIsCheckingAuth(false);
+      if (sessionToken && email && name && role) {
+        // User has an existing session
+        setUserEmail(email);
+        setUserName(name);
+        setUserRole(role);
+        setIsAuthenticated(true);
       }
+      setIsCheckingAuth(false);
     };
 
-    authenticateUser();
+    checkExistingSession();
   }, []);
+
+  const handleLogin = async () => {
+    if (!userEmail.trim() || !password.trim()) {
+      setAuthError("Please enter your email and password");
+      return;
+    }
+
+    setIsLoggingIn(true);
+    setAuthError("");
+
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail.trim(), password: password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        if (data.mustChangePassword) {
+          // User must change password before continuing
+          setUserEmail(data.user.email);
+          setUserName(data.user.name);
+          setUserRole(data.user.role);
+          setMustChangePassword(true);
+        } else {
+          // Normal login success
+          setUserEmail(data.user.email);
+          setUserName(data.user.name);
+          setUserRole(data.user.role);
+          setIsAuthenticated(true);
+          localStorage.setItem('stockTrackerSessionToken', data.sessionToken);
+          localStorage.setItem('stockTrackerUserEmail', data.user.email);
+          localStorage.setItem('stockTrackerUserName', data.user.name);
+          localStorage.setItem('stockTrackerUserRole', data.user.role);
+        }
+      } else {
+        setAuthError(data.error || "Login failed");
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setAuthError("Login failed. Please try again.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword.trim() || !confirmPassword.trim()) {
+      setAuthError("Please enter and confirm your new password");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setAuthError("Passwords do not match");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setAuthError("Password must be at least 6 characters");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setAuthError("");
+
+    try {
+      const response = await fetch('/api/changePassword', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: userEmail, 
+          currentPassword: password,
+          newPassword: newPassword 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Password changed successfully, now log them in
+        setMustChangePassword(false);
+        setIsAuthenticated(true);
+        
+        // Generate a session token (reuse login logic)
+        const sessionToken = Buffer.from(
+          `${userEmail}:${Date.now()}:${Math.random()}`
+        ).toString('base64');
+        
+        localStorage.setItem('stockTrackerSessionToken', sessionToken);
+        localStorage.setItem('stockTrackerUserEmail', userEmail);
+        localStorage.setItem('stockTrackerUserName', userName);
+        localStorage.setItem('stockTrackerUserRole', userRole);
+        
+        setPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        setAuthError(data.error || "Failed to change password");
+      }
+    } catch (error) {
+      console.error('Change password error:', error);
+      setAuthError("Failed to change password. Please try again.");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleChangeUser = () => {
+    localStorage.removeItem('stockTrackerSessionToken');
+    localStorage.removeItem('stockTrackerUserEmail');
+    localStorage.removeItem('stockTrackerUserName');
+    localStorage.removeItem('stockTrackerUserRole');
+    setUserEmail("");
+    setUserName("");
+    setUserRole("");
+    setPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setIsAuthenticated(false);
+    setMustChangePassword(false);
+    setAuthError("");
+  };
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputFiles = e.target.files;
@@ -198,11 +309,48 @@ export default function ExcelEditor() {
     }
   };
 
-  const handleChangeUser = () => {
-    localStorage.removeItem('stockTrackerUserEmail');
-    localStorage.removeItem('stockTrackerUserName');
-    localStorage.removeItem('stockTrackerUserRole');
-    window.location.reload();
+  // Validate part numbers against database - returns all valid part numbers
+  const validatePartNumbers = async (partNumbers: string[]): Promise<string[]> => {
+    if (partNumbers.length === 0) return [];
+
+    // Generate variations for each part number to handle OCR mistakes
+    const allVariations: string[] = [];
+    partNumbers.forEach(partNum => {
+      allVariations.push(partNum); // Original
+      
+      // Create variations with common character swaps
+      const variations = [
+        partNum.replace(/8/g, 'B'),  // Try 8 as B
+        partNum.replace(/B/g, '8'),  // Try B as 8
+        partNum.replace(/0/g, 'O'),  // Try 0 as O
+        partNum.replace(/O/g, '0'),  // Try O as 0
+        partNum.replace(/1/g, 'I'),  // Try 1 as I
+        partNum.replace(/I/g, '1'),  // Try I as 1
+        partNum.replace(/5/g, 'S'),  // Try 5 as S
+        partNum.replace(/S/g, '5'),  // Try S as 5
+      ];
+      
+      allVariations.push(...variations);
+    });
+
+    // Remove duplicates
+    const uniqueVariations = [...new Set(allVariations)];
+
+    try {
+      const res = await fetch("/api/validatePartNumbers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partNumbers: uniqueVariations }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return data.validPartNumbers || [];
+      }
+    } catch (error) {
+      console.error("Error validating part numbers:", error);
+    }
+    return [];
   };
 
   const searchPartNumbers = async (query: string) => {
@@ -344,38 +492,146 @@ export default function ExcelEditor() {
     }
   };
 
-  // Show loading or auth error
+  // Show loading or auth screens
   if (isCheckingAuth) {
     return (
       <div className="p-4">
         <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
           <div className="text-center">
-            <h2 className="text-xl font-bold mb-4">Authenticating...</h2>
-            <p className="text-gray-600">Please wait while we verify your access.</p>
+            <h2 className="text-xl font-bold mb-4">Loading...</h2>
+            <p className="text-gray-600">Please wait...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated || authError) {
+  // Password change screen (first-time login)
+  if (mustChangePassword) {
     return (
       <div className="p-4">
-        <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-red-50 border-red-300">
-          <h2 className="text-xl font-bold mb-4 text-red-800">Access Denied</h2>
-          <p className="mb-4 text-red-700">{authError || "Your email is not authorized to access this system."}</p>
-          <p className="text-sm text-gray-700 mb-4">
-            Please contact your administrator to request access.
+        <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-yellow-50 border-yellow-300">
+          <h2 className="text-xl font-bold mb-4 text-gray-900">Change Password Required</h2>
+          <p className="mb-4 text-gray-700">
+            Welcome <strong>{userName}</strong>! You must change your password before continuing.
           </p>
+          
+          {authError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-300 rounded text-red-700">
+              {authError}
+            </div>
+          )}
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleChangePassword();
+                }
+              }}
+              placeholder="Enter new password (min 6 characters)"
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleChangePassword();
+                }
+              }}
+              placeholder="Confirm new password"
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
           <button
-            onClick={() => {
-              localStorage.removeItem('stockTrackerUserEmail');
-              window.location.reload();
-            }}
-            className="w-full px-3 py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700"
+            onClick={handleChangePassword}
+            disabled={isChangingPassword || !newPassword.trim() || !confirmPassword.trim()}
+            className="w-full px-3 py-2 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 disabled:bg-gray-400 mb-2"
           >
-            Try Different Email
+            {isChangingPassword ? "Changing Password..." : "Change Password"}
           </button>
+
+          <button
+            onClick={handleChangeUser}
+            className="w-full px-3 py-2 bg-gray-200 text-gray-700 rounded font-semibold hover:bg-gray-300"
+          >
+            ← Back to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Login screen
+  if (!isAuthenticated) {
+    return (
+      <div className="p-4">
+        <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
+          <h2 className="text-xl font-bold mb-4 text-gray-900">Sign In</h2>
+          <p className="mb-4 text-gray-600">Enter your email and password to access the system</p>
+          
+          {authError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-300 rounded text-red-700">
+              {authError}
+            </div>
+          )}
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+            <input
+              type="email"
+              value={userEmail}
+              onChange={(e) => setUserEmail(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleLogin();
+                }
+              }}
+              placeholder="your.email@example.com"
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleLogin();
+                }
+              }}
+              placeholder="Enter your password"
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <button
+            onClick={handleLogin}
+            disabled={isLoggingIn || !userEmail.trim() || !password.trim()}
+            className="w-full px-3 py-2 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            {isLoggingIn ? "Signing in..." : "Sign In"}
+          </button>
+
+          <p className="mt-4 text-xs text-gray-500 text-center">
+            Only authorized users can access this system
+          </p>
         </div>
       </div>
     );
@@ -420,6 +676,15 @@ export default function ExcelEditor() {
 
   const handleSubmitBatch = async () => {
     if (batchItems.length === 0) return;
+
+    // Validate all quantities before submitting
+    const regex = /^[+-]\d+$/;
+    const invalidItems = batchItems.filter(item => !regex.test(item.quantity.trim()));
+    
+    if (invalidItems.length > 0) {
+      alert(`Invalid quantity format for: ${invalidItems.map(item => item.partNumber).join(", ")}.\nPlease use +5 to add or -3 to remove.`);
+      return;
+    }
 
     setIsProcessingBatch(true);
     try {
@@ -472,57 +737,137 @@ export default function ExcelEditor() {
     }
   };
 
+  // -------- Text scanning (camera + upload) for batch entry --------
+  const stopCamera = () => {
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+    }
+    setIsCameraActive(false);
+  };
+
+  const startCamera = async () => {
+    setScanError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setIsCameraActive(true);
+      }
+    } catch (err) {
+      console.error("Camera error", err);
+      setScanError("Unable to access camera. Please check permissions or use Upload.");
+    }
+  };
+
+  const applyScanResults = (tokens: string[]) => {
+    setScanResults(tokens);
+    if (tokens.length > 0) {
+      setCurrentBatchPart(tokens[0]);
+      setScanError("");
+    } else {
+      setScanError("No clear text found. Try a closer photo or better lighting.");
+    }
+  };
+
+  const captureFromCamera = async () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current || document.createElement("canvas");
+    canvasRef.current = canvas;
+    const width = video.videoWidth || 1280;
+    const height = video.videoHeight || 720;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, width, height);
+
+    setIsScanningImage(true);
+    try {
+      const tokens = await scanPartNumbersFromCanvas(canvas);
+      applyScanResults(tokens);
+    } catch (err) {
+      console.error("Scan error", err);
+      setScanError("Scan failed. Please try again.");
+    } finally {
+      setIsScanningImage(false);
+    }
+  };
+
+  const handleBatchImageUpload = async (file: File | null) => {
+    if (!file) return;
+    setIsScanningImage(true);
+    setScanError("");
+    try {
+      const tokens = await scanPartNumbersFromBlob(file);
+      applyScanResults(tokens);
+    } catch (err) {
+      console.error("Upload scan error", err);
+      setScanError("Could not read that image. Try a clearer photo.");
+    } finally {
+      setIsScanningImage(false);
+    }
+  };
+
+  const openScanModal = () => {
+    setScanResults([]);
+    setScanError("");
+    setIsScanModalOpen(true);
+  };
+
+  const closeScanModal = () => {
+    stopCamera();
+    setIsScanModalOpen(false);
+  };
+
   if (!isPartNumberSubmitted) {
     if (batchMode) {
       return (
-        <div className="p-4">
-          <div className="max-w-2xl mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
+        <>
+          <div className="p-4">
+            <div className="max-w-2xl mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Batch Entry Mode</h2>
               <button
-                onClick={() => {
-                  localStorage.removeItem('stockTrackerUserName');
-                  localStorage.removeItem('stockTrackerUserRole');
-                  setUserName("");
-                  setUserRole("operator");
-                  setIsNameSubmitted(false);
-                  setPartNumber("");
-                  setIsPartNumberSubmitted(false);
-                  setNewQuantity("");
-                  setIsQuantitySubmitted(false);
-                  setLocation("");
-                  setActualCount("");
-                  setBatchMode(false);
-                  setBatchItems([]);
-                }}
+                onClick={handleChangeUser}
                 className="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
               >
                 Change User
               </button>
             </div>
             <p className="mb-4 text-sm text-gray-900">
-              Welcome, <span className="font-semibold">{userName}</span>!{" "}
+              Welcome, <span className="font-semibold">{userName}</span>! {" "}
               <span className={`inline-block px-2 py-1 text-xs font-semibold rounded ${
-                userRole === "admin" ? "bg-purple-200 text-purple-800" :
-                userRole === "operator" ? "bg-blue-200 text-blue-800" :
-                "bg-gray-200 text-gray-800"
+                userRole === "admin" ? "bg-purple-200 text-purple-800" : "bg-blue-200 text-blue-800"
               }`}>
                 {userRole.toUpperCase()}
               </span>
               <br />Add multiple items to process together.
             </p>
 
-            {/* Current batch list */}
             {batchItems.length > 0 && (
               <div className="mb-4 p-3 bg-white border rounded">
                 <h3 className="font-semibold mb-2">Items to process ({batchItems.length}):</h3>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
+                <div className="space-y-2 max-h-60 overflow-y-auto">
                   {batchItems.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <span className="text-sm">{item.partNumber} → {item.quantity}</span>
+                    <div key={index} className="flex gap-2 items-center p-2 bg-gray-50 rounded">
+                      <span className="text-sm font-medium flex-shrink-0 w-32">{item.partNumber}</span>
+                      <input
+                        type="text"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const newItems = [...batchItems];
+                          newItems[index].quantity = e.target.value;
+                          setBatchItems(newItems);
+                        }}
+                        placeholder="+5 or -3"
+                        className="flex-1 px-2 py-1 text-sm border rounded"
+                      />
                       <button
                         onClick={() => handleRemoveFromBatch(index)}
-                        className="text-red-500 hover:text-red-700 text-sm font-semibold"
+                        className="text-red-500 hover:text-red-700 text-sm font-semibold flex-shrink-0"
                       >
                         Remove
                       </button>
@@ -532,7 +877,6 @@ export default function ExcelEditor() {
               </div>
             )}
 
-            {/* Add new item */}
             <div className="mb-4">
               <label className="block mb-2 font-semibold">Part Number:</label>
               <div className="relative mb-3">
@@ -567,6 +911,54 @@ export default function ExcelEditor() {
                 )}
               </div>
 
+              <div className="flex gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => { openScanModal(); startCamera(); }}
+                  className="flex-1 px-3 py-2 bg-blue-600 text-white rounded font-semibold hover:bg-blue-700"
+                >
+                  Scan with Camera
+                </button>
+                <label className="flex-1">
+                  <span className="block w-full px-3 py-2 bg-gray-200 text-gray-800 text-center rounded font-semibold hover:bg-gray-300 cursor-pointer">
+                    Upload Image
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      handleBatchImageUpload(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+
+              {scanResults.length > 0 && (
+                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <p className="font-semibold text-sm text-blue-900 mb-2">Tap a scanned part number:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {scanResults.slice(0, 6).map((token) => (
+                      <button
+                        key={token}
+                        onClick={() => setCurrentBatchPart(token)}
+                        className="px-3 py-1 bg-white border border-blue-200 rounded hover:bg-blue-100 text-sm font-semibold"
+                      >
+                        {token}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {scanError && (
+                <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+                  {scanError}
+                </div>
+              )}
+
               <label className="block mb-2 font-semibold">Quantity (+/-)</label>
               <input
                 type="text"
@@ -590,14 +982,6 @@ export default function ExcelEditor() {
               </button>
             </div>
 
-            {/* Action buttons */}
-            {userRole === "viewer" && (
-              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded">
-                <p className="text-sm text-yellow-800">
-                  ⚠️ <span className="font-semibold">View-only access:</span> You don't have permission to submit transactions.
-                </p>
-              </div>
-            )}
             <div className="flex gap-2">
               <button
                 onClick={() => setBatchMode(false)}
@@ -607,14 +991,88 @@ export default function ExcelEditor() {
               </button>
               <button
                 onClick={handleSubmitBatch}
-                disabled={batchItems.length === 0 || isProcessingBatch || userRole === "viewer"}
+                disabled={batchItems.length === 0 || isProcessingBatch}
                 className="flex-1 px-3 py-2 bg-blue-500 text-white rounded font-semibold disabled:bg-gray-400"
               >
-                {isProcessingBatch ? "Processing..." : userRole === "viewer" ? "View-only (No Access)" : `Submit All (${batchItems.length})`}
+                {isProcessingBatch ? "Processing..." : `Submit All (${batchItems.length})`}
               </button>
             </div>
           </div>
         </div>
+
+        {isScanModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl p-4">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-bold text-gray-900">Text Scan</h3>
+                <button onClick={closeScanModal} className="text-gray-600 hover:text-gray-800 font-semibold">✕</button>
+              </div>
+              <div className="space-y-3">
+                <div className="rounded-lg overflow-hidden border border-gray-200 bg-black/5">
+                  <video ref={videoRef} className="w-full h-64 bg-black" autoPlay muted playsInline />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={startCamera}
+                    className="flex-1 px-3 py-2 bg-gray-200 text-gray-800 rounded font-semibold hover:bg-gray-300"
+                  >
+                    Enable Camera
+                  </button>
+                  <button
+                    onClick={captureFromCamera}
+                    disabled={!isCameraActive || isScanningImage}
+                    className="flex-1 px-3 py-2 bg-blue-600 text-white rounded font-semibold disabled:bg-gray-400"
+                  >
+                    {isScanningImage ? "Scanning..." : "Capture & Scan"}
+                  </button>
+                  <button
+                    onClick={closeScanModal}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded font-semibold hover:bg-gray-200"
+                  >
+                    Close
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600">Tip: Hold the label close, ensure good light, and keep text horizontal.</p>
+                {scanResults.length > 0 && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                    <p className="font-semibold text-sm text-blue-900 mb-2">Detected:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {scanResults.slice(0, 8).map((token) => (
+                        <button
+                          key={token}
+                          onClick={() => { setCurrentBatchPart(token); closeScanModal(); }}
+                          className="px-3 py-1 bg-white border border-blue-200 rounded hover:bg-blue-100 text-sm font-semibold"
+                        >
+                          {token}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {scanError && (
+                  <div className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">{scanError}</div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  id="batch-upload-hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    handleBatchImageUpload(file);
+                    e.target.value = "";
+                  }}
+                />
+                <label htmlFor="batch-upload-hidden" className="block w-full">
+                  <span className="block w-full text-center px-3 py-2 bg-gray-200 text-gray-800 rounded font-semibold hover:bg-gray-300 cursor-pointer">
+                    Or Upload Image Instead
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+        </>
       );
     }
 
@@ -623,27 +1081,35 @@ export default function ExcelEditor() {
         <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">Part Number</h2>
-            <button
-              onClick={handleChangeUser}
-              className="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-            >
-              Change User
-            </button>
+            <div className="flex gap-2">
+              {userRole === "admin" && (
+                <a
+                  href="/view"
+                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold"
+                >
+                  📊 View
+                </a>
+              )}
+              <button
+                onClick={handleChangeUser}
+                className="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+              >
+                Change User
+              </button>
+            </div>
           </div>
           <p className="mb-4 text-sm text-gray-900">
-            Welcome, <span className="font-semibold">{userName}</span>!{" "}
+            Welcome, <span className="font-semibold">{userName}</span>! {" "}
             <span className={`inline-block px-2 py-1 text-xs font-semibold rounded ${
-              userRole === "admin" ? "bg-purple-200 text-purple-800" :
-              userRole === "operator" ? "bg-blue-200 text-blue-800" :
-              "bg-gray-200 text-gray-800"
+              userRole === "admin" ? "bg-purple-200 text-purple-800" : "bg-blue-200 text-blue-800"
             }`}>
               {userRole.toUpperCase()}
             </span>
           </p>
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
             <p className="text-sm text-blue-900">
-              💡 <span className="font-semibold">Tip:</span> Need to process multiple items? 
-              <button 
+              💡 <span className="font-semibold">Tip:</span> Need to process multiple items?
+              <button
                 onClick={() => setBatchMode(true)}
                 className="ml-2 text-blue-600 underline font-semibold"
               >
@@ -651,54 +1117,56 @@ export default function ExcelEditor() {
               </button>
             </p>
           </div>
-          <label className="block mb-2 font-semibold">What part number do you want to take out?</label>
-          <div className="relative mb-4">
-            <input
-              type="text"
-              value={partNumber}
-              onChange={(e) => handlePartNumberChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && partNumber.trim() && !isSavingPartNumber) {
-                  handleSubmitPartNumber();
-                } else if (e.key === "Escape") {
-                  setShowSuggestions(false);
-                }
-              }}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-              placeholder="Part number"
-              className="w-full px-3 py-2 border rounded"
-              autoFocus
-              disabled={isSavingPartNumber}
-            />
-            {isSearching && (
-              <div className="absolute right-3 top-3 text-gray-500 text-sm">
-                Searching...
-              </div>
-            )}
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                {suggestions.map((suggestion, index) => (
-                  <div
-                    key={index}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      handleSelectSuggestion(suggestion);
-                    }}
-                    className="px-3 py-2 hover:bg-blue-100 cursor-pointer border-b last:border-b-0"
-                  >
-                    {suggestion}
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="mb-2">
+            <label className="font-semibold">What part number do you want to take out?</label>
+            <div className="relative mb-4">
+              <input
+                type="text"
+                value={partNumber}
+                onChange={(e) => handlePartNumberChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && partNumber.trim() && !isSavingPartNumber) {
+                    handleSubmitPartNumber();
+                  } else if (e.key === "Escape") {
+                    setShowSuggestions(false);
+                  }
+                }}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                placeholder="Part number"
+                className="w-full px-3 py-2 border rounded"
+                autoFocus
+                disabled={isSavingPartNumber}
+              />
+              {isSearching && (
+                <div className="absolute right-3 top-3 text-gray-500 text-sm">
+                  Searching...
+                </div>
+              )}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {suggestions.map((suggestion, index) => (
+                    <div
+                      key={index}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSelectSuggestion(suggestion);
+                      }}
+                      className="px-3 py-2 hover:bg-blue-100 cursor-pointer border-b last:border-b-0"
+                    >
+                      {suggestion}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleSubmitPartNumber}
+              disabled={!partNumber.trim() || isSavingPartNumber}
+              className="w-full px-3 py-2 bg-blue-500 text-white rounded font-semibold disabled:bg-gray-400"
+            >
+              {isSavingPartNumber ? "Loading..." : "Continue"}
+            </button>
           </div>
-          <button
-            onClick={handleSubmitPartNumber}
-            disabled={!partNumber.trim() || isSavingPartNumber}
-            className="w-full px-3 py-2 bg-blue-500 text-white rounded font-semibold disabled:bg-gray-400"
-          >
-            {isSavingPartNumber ? "Loading..." : "Continue"}
-          </button>
         </div>
       </div>
     );
@@ -732,19 +1200,12 @@ export default function ExcelEditor() {
             autoFocus
             disabled={isSavingQuantity}
           />
-          {userRole === "viewer" && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded">
-              <p className="text-sm text-yellow-800">
-                ⚠️ <span className="font-semibold">View-only access:</span> You don't have permission to submit transactions.
-              </p>
-            </div>
-          )}
           <button
             onClick={handleSubmitQuantity}
-            disabled={!newQuantity.trim() || isSavingQuantity || userRole === "viewer"}
+            disabled={!newQuantity.trim() || isSavingQuantity}
             className="w-full px-3 py-2 bg-blue-500 text-white rounded font-semibold disabled:bg-gray-400"
           >
-            {isSavingQuantity ? "Saving..." : userRole === "viewer" ? "View-only (No Access)" : "Continue"}
+            {isSavingQuantity ? "Saving..." : "Continue"}
           </button>
         </div>
       </div>
@@ -775,20 +1236,30 @@ export default function ExcelEditor() {
             {!location.includes("\n") && partNumber && (
               <p className="text-white text-center mt-6 text-lg">Part: {partNumber}</p>
             )}
-            <button
-              onClick={() => {
-                // Reset to part number question (keep username)
-                setPartNumber("");
-                setIsPartNumberSubmitted(false);
-                setNewQuantity("");
-                setIsQuantitySubmitted(false);
-                setLocation("");
-                setActualCount("");
-              }}
-              className="w-full mt-6 px-6 py-3 bg-white text-blue-700 font-bold rounded-xl hover:bg-gray-100 transition-colors"
-            >
-              ← Start New Entry
-            </button>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  // Reset to part number question (keep username)
+                  setPartNumber("");
+                  setIsPartNumberSubmitted(false);
+                  setNewQuantity("");
+                  setIsQuantitySubmitted(false);
+                  setLocation("");
+                  setActualCount("");
+                }}
+                className="flex-1 px-6 py-3 bg-white text-blue-700 font-bold rounded-xl hover:bg-gray-100 transition-colors"
+              >
+                🏠 Home
+              </button>
+              {userRole === "admin" && (
+                <a
+                  href="/view"
+                  className="flex-1 px-6 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors text-center"
+                >
+                  📊 View Records
+                </a>
+              )}
+            </div>
           </div>
         </div>
       )}
