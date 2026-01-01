@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getSupabase } from "@/lib/supabaseServer";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,6 +8,8 @@ export async function POST(req: NextRequest) {
     if (!partNumber || typeof partNumber !== "string") {
       return NextResponse.json({ error: "Part number is required" }, { status: 400 });
     }
+
+    const supabase = getSupabase();
 
     // Query inventory table
     const { data, error } = await supabase

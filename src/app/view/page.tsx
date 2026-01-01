@@ -19,6 +19,24 @@ export default function ViewPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterColumn, setFilterColumn] = useState<"all" | "name" | "partNumber" | "quantity">("all");
   const [dateFilter, setDateFilter] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [deleteAllPassword, setDeleteAllPassword] = useState("");
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+
+  useEffect(() => {
+    // Check if user is admin
+    const userRole = localStorage.getItem('stockTrackerUserRole');
+    
+    if (userRole === 'admin') {
+      setIsAdmin(true);
+      fetchData();
+    } else {
+      setIsAdmin(false);
+    }
+    setCheckingAuth(false);
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -100,13 +118,71 @@ export default function ViewPage() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const handleDeleteAll = async () => {
+    if (!deleteAllPassword.trim()) {
+      alert("Please enter your password");
+      return;
+    }
+
+    if (!confirm("⚠️ WARNING: This will permanently delete ALL inventory data. This action cannot be undone. Are you absolutely sure?")) return;
+
+    setIsDeletingAll(true);
+    try {
+      const userEmail = localStorage.getItem('stockTrackerUserEmail');
+      const res = await fetch("/api/deleteAll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: deleteAllPassword, email: userEmail }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("All data has been deleted successfully");
+        setShowDeleteAllModal(false);
+        setDeleteAllPassword("");
+        fetchData(); // Refresh the data
+      } else {
+        alert(`Failed to delete all data: ${data.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting all data");
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
 
   useEffect(() => {
     applyFilters();
   }, [searchTerm, filterColumn, dateFilter, data]);
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-red-50 border border-red-200 rounded-xl p-8 text-center">
+          <h1 className="text-2xl font-bold text-red-900 mb-4">🚫 Admin Access Required</h1>
+          <p className="text-red-800 mb-6">
+            Only administrators can access this page.
+          </p>
+          <a
+            href="/"
+            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+          >
+            ← Go Home
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4">
@@ -123,17 +199,29 @@ export default function ViewPage() {
           </div>
           <div className="flex gap-2">
             <a
-              href="/admin"
-              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-semibold"
+              href="/import"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold"
             >
-              👥 Users
+              📤 Import
             </a>
             <a
               href="/manage"
               className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold"
             >
-              Manage Inventory
+              🗂️ Manage
             </a>
+            <a
+              href="/admin"
+              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-semibold"
+            >
+              👥 Users
+            </a>
+            <button
+              onClick={() => setShowDeleteAllModal(true)}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold"
+            >
+              🗑️ Delete All
+            </button>
             <button
               onClick={fetchData}
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -253,6 +341,50 @@ export default function ViewPage() {
           </div>
         )}
       </div>
+
+      {/* Delete All Modal */}
+      {showDeleteAllModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <h2 className="text-xl font-bold text-red-600 mb-4">⚠️ Delete All Data</h2>
+            <p className="text-gray-700 mb-4">
+              This action will permanently delete ALL inventory data. This cannot be undone.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Enter your admin password to confirm:
+              </label>
+              <input
+                type="password"
+                value={deleteAllPassword}
+                onChange={(e) => setDeleteAllPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="Admin password"
+                disabled={isDeletingAll}
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowDeleteAllModal(false);
+                  setDeleteAllPassword("");
+                }}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                disabled={isDeletingAll}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAll}
+                disabled={isDeletingAll || !deleteAllPassword.trim()}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed"
+              >
+                {isDeletingAll ? "Deleting..." : "Delete All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

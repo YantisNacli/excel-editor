@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { scanPartNumbersFromBlob, scanPartNumbersFromCanvas } from "../../lib/textScan";
 
 type BatchItem = {
   material: string;
@@ -19,7 +20,6 @@ export default function ManagePage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [checkResult, setCheckResult] = useState<{ material: string; actual_count: number; location: string } | null>(null);
   const [checkBatchItems, setCheckBatchItems] = useState<Array<{ material: string; actual_count: number; location: string }>>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -28,6 +28,13 @@ export default function ManagePage() {
   const [duplicateData, setDuplicateData] = useState<Array<{ material: string; newData: any; oldData: any }>>([]);
   const [pendingBatchItems, setPendingBatchItems] = useState<BatchItem[]>([]);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ material: string; actual_count: number; location: string } | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isScanningImage, setIsScanningImage] = useState(false);
+  const [scanResults, setScanResults] = useState<string[]>([]);
+  const [scanError, setScanError] = useState<string>("");
 
   const handleAddToBatch = () => {
     if (!currentMaterial.trim() || !currentLocation.trim()) {
@@ -54,6 +61,51 @@ export default function ManagePage() {
 
   const handleRemoveFromBatch = (index: number) => {
     setBatchItems(batchItems.filter((_, i) => i !== index));
+  };
+
+  const handleAddToCheckBatch = async () => {
+    if (!currentMaterial.trim()) {
+      setError("Please enter a material/part number");
+      return;
+    }
+
+    const normalizedMaterial = currentMaterial.trim().toUpperCase();
+
+    setIsProcessing(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const res = await fetch("/api/checkInventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ material: normalizedMaterial }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        setError(data.error || "Part not found in inventory");
+        return;
+      }
+
+      const nextItem = {
+        material: normalizedMaterial,
+        actual_count: data.actual_count ?? data.actualCount ?? 0,
+        location: data.location || "Unknown",
+      };
+
+      setCheckBatchItems([...checkBatchItems, nextItem]);
+      setCurrentMaterial("");
+      setShowSuggestions(false);
+      setMessage(`✅ Added ${normalizedMaterial} to check list`);
+      setTimeout(() => setMessage(""), 2000);
+    } catch (err) {
+      setError("❌ Failed to check part. Please try again.");
+      console.error(err);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleSubmitBatch = async () => {
@@ -236,6 +288,121 @@ export default function ManagePage() {
     setShowSuggestions(false);
   };
 
+  const validatePartNumbers = async (partNumbers: string[]): Promise<string[]> => {
+    if (partNumbers.length === 0) return [];
+    const allVariations: string[] = [];
+    partNumbers.forEach(partNum => {
+      allVariations.push(partNum);
+      const variations = [
+        partNum.replace(/8/g, 'B'), partNum.replace(/B/g, '8'),
+        partNum.replace(/0/g, 'O'), partNum.replace(/O/g, '0'),
+        partNum.replace(/1/g, 'I'), partNum.replace(/I/g, '1'),
+        partNum.replace(/5/g, 'S'), partNum.replace(/S/g, '5'),
+      ];
+      allVariations.push(...variations);
+    });
+    const uniqueVariations = [...new Set(allVariations)];
+    try {
+      const res = await fetch("/api/validatePartNumbers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partNumbers: uniqueVariations }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.validPartNumbers || [];
+      }
+    } catch (error) {
+      console.error("Error validating part numbers:", error);
+    }
+    return [];
+  };
+
+  // Text scanning (camera + upload) for check mode
+  const stopCamera = () => {
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+    }
+    setIsCameraActive(false);
+  };
+
+  const startCamera = async () => {
+    setScanError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setIsCameraActive(true);
+      }
+    } catch (err) {
+      console.error("Camera error", err);
+      setScanError("Unable to access camera. Please check permissions or use Upload.");
+    }
+  };
+
+  const applyScanResults = (tokens: string[]) => {
+    setScanResults(tokens);
+    if (tokens.length > 0) {
+      setCurrentMaterial(tokens[0]);
+      setScanError("");
+    } else {
+      setScanError("No clear text found. Try a closer photo or better lighting.");
+    }
+  };
+
+  const captureFromCamera = async () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current || document.createElement("canvas");
+    canvasRef.current = canvas;
+    const width = video.videoWidth || 1280;
+    const height = video.videoHeight || 720;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, width, height);
+
+    setIsScanningImage(true);
+    try {
+      const tokens = await scanPartNumbersFromCanvas(canvas);
+      applyScanResults(tokens);
+    } catch (err) {
+      console.error("Scan error", err);
+      setScanError("Scan failed. Please try again.");
+    } finally {
+      setIsScanningImage(false);
+    }
+  };
+
+  const handleCheckImageUpload = async (file: File | null) => {
+    if (!file) return;
+    setIsScanningImage(true);
+    setScanError("");
+    try {
+      const tokens = await scanPartNumbersFromBlob(file);
+      applyScanResults(tokens);
+    } catch (err) {
+      console.error("Upload scan error", err);
+      setScanError("Could not read that image. Try a clearer photo.");
+    } finally {
+      setIsScanningImage(false);
+    }
+  };
+
+  const openScanModal = () => {
+    setScanResults([]);
+    setScanError("");
+    setIsScanModalOpen(true);
+  };
+
+  const closeScanModal = () => {
+    stopCamera();
+    setIsScanModalOpen(false);
+  };
+
   useEffect(() => {
     // Check user role from localStorage
     const role = localStorage.getItem('stockTrackerUserRole');
@@ -243,40 +410,46 @@ export default function ManagePage() {
     setCheckingAuth(false);
   }, []);
 
-  const handleAddToCheckBatch = async () => {
-    if (!currentMaterial.trim()) {
-      setError("Please enter a material/part number");
-      return;
-    }
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
-    setIsProcessing(true);
-    setError("");
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    );
+  }
 
-    try {
-      const response = await fetch("/api/checkInventory", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ material: currentMaterial }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setCheckBatchItems([...checkBatchItems, data]);
-        setCurrentMaterial("");
-        setShowSuggestions(false);
-        setMessage(`✅ Added ${data.material} to batch`);
-        setTimeout(() => setMessage(""), 2000);
-      } else {
-        setError(`❌ ${data.error || "Part not found"}`);
-      }
-    } catch (err) {
-      setError("❌ Failed to check part. Please try again.");
-      console.error(err);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  if (!userRole || !["operator", "admin"].includes(userRole)) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white border border-gray-300 rounded-lg p-6 text-center">
+          <h1 className="text-2xl font-bold text-red-900 mb-4">🚫 Access Denied</h1>
+          <p className="text-red-800 mb-6">
+            You need operator or admin privileges to manage inventory.
+          </p>
+          <div className="flex gap-4">
+            <a
+              href="/"
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold text-center"
+            >
+              ← Go Home
+            </a>
+            <a
+              href="/view"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-center"
+            >
+              View Records
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleRemoveFromCheckBatch = (index: number) => {
     setCheckBatchItems(checkBatchItems.filter((_, i) => i !== index));
@@ -324,22 +497,26 @@ export default function ManagePage() {
   return (
     <div className="min-h-screen bg-white p-4">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-4">
-            <a
-              href="/view"
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-semibold"
-            >
-              ← Back to View
-            </a>
-            <h1 className="text-2xl font-bold text-gray-900">Manage Inventory</h1>
-          </div>
+        <div className="flex gap-2 mb-6">
+          <a href="/" className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-semibold">
+            ← Home
+          </a>
+          <a href="/view" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold">
+            📊 View Records
+          </a>
+          <a href="/import" className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 font-semibold">
+            📤 Import
+          </a>
+          <a href="/admin" className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-semibold">
+            👥 Users
+          </a>
         </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">🗂️ Manage Inventory</h1>
 
         {/* Mode Toggle */}
         <div className="mb-6 flex gap-2">
           <button
-            onClick={() => { setMode("add"); setError(""); setCheckResult(null); setDeleteConfirmation(null); }}
+            onClick={() => { setMode("add"); setError(""); setDeleteConfirmation(null); }}
             className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
               mode === "add"
                 ? "bg-blue-600 text-white"
@@ -481,6 +658,52 @@ export default function ManagePage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                 autoFocus
               />
+              <div className="flex gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => { openScanModal(); startCamera(); }}
+                  className="flex-1 px-3 py-2 bg-green-700 text-white rounded font-semibold hover:bg-green-800"
+                >
+                  Scan with Camera
+                </button>
+                <label className="flex-1">
+                  <span className="block w-full px-3 py-2 bg-gray-200 text-gray-800 text-center rounded font-semibold hover:bg-gray-300 cursor-pointer">
+                    Upload Image
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      handleCheckImageUpload(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+              {scanResults.length > 0 && (
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
+                  <p className="font-semibold text-sm text-green-900 mb-2">Tap a scanned part number:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {scanResults.slice(0, 6).map((token) => (
+                      <button
+                        key={token}
+                        onClick={() => { setCurrentMaterial(token); setShowSuggestions(false); closeScanModal(); }}
+                        className="px-3 py-1 bg-white border border-green-200 rounded hover:bg-green-100 text-sm font-semibold"
+                      >
+                        {token}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {scanError && (
+                <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+                  {scanError}
+                </div>
+              )}
               
               {/* Autocomplete Dropdown */}
               {showSuggestions && suggestions.length > 0 && (
@@ -714,6 +937,80 @@ export default function ManagePage() {
                     ✅ Yes, Replace with New Data
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isScanModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl p-4">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-bold text-gray-900">Text Scan</h3>
+                <button onClick={closeScanModal} className="text-gray-600 hover:text-gray-800 font-semibold">✕</button>
+              </div>
+              <div className="space-y-3">
+                <div className="rounded-lg overflow-hidden border border-gray-200 bg-black/5">
+                  <video ref={videoRef} className="w-full h-64 bg-black" autoPlay muted playsInline />
+                  <canvas ref={canvasRef} className="hidden" />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={startCamera}
+                    className="flex-1 px-3 py-2 bg-gray-200 text-gray-800 rounded font-semibold hover:bg-gray-300"
+                  >
+                    Enable Camera
+                  </button>
+                  <button
+                    onClick={captureFromCamera}
+                    disabled={!isCameraActive || isScanningImage}
+                    className="flex-1 px-3 py-2 bg-green-700 text-white rounded font-semibold disabled:bg-gray-400"
+                  >
+                    {isScanningImage ? "Scanning..." : "Capture & Scan"}
+                  </button>
+                  <button
+                    onClick={closeScanModal}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded font-semibold hover:bg-gray-200"
+                  >
+                    Close
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600">Tip: Hold the label close, ensure good light, and keep text horizontal.</p>
+                {scanResults.length > 0 && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded">
+                    <p className="font-semibold text-sm text-green-900 mb-2">Detected:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {scanResults.slice(0, 8).map((token) => (
+                        <button
+                          key={token}
+                          onClick={() => { setCurrentMaterial(token); setShowSuggestions(false); closeScanModal(); }}
+                          className="px-3 py-1 bg-white border border-green-200 rounded hover:bg-green-100 text-sm font-semibold"
+                        >
+                          {token}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {scanError && (
+                  <div className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">{scanError}</div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  id="check-upload-hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    handleCheckImageUpload(file);
+                    e.target.value = "";
+                  }}
+                />
+                <label htmlFor="check-upload-hidden" className="block w-full">
+                  <span className="block w-full text-center px-3 py-2 bg-gray-200 text-gray-800 rounded font-semibold hover:bg-gray-300 cursor-pointer">
+                    Or Upload Image Instead
+                  </span>
+                </label>
               </div>
             </div>
           </div>

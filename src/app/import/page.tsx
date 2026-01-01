@@ -1,26 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function ImportPage() {
-  const [password, setPassword] = useState("");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState("");
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simple password check - you can change this password
-    if (password === "admin123") {
-      setIsAuthenticated(true);
-      setError("");
+  useEffect(() => {
+    // Check if user is admin
+    const userRole = localStorage.getItem('stockTrackerUserRole');
+    
+    if (userRole === 'admin') {
+      setIsAdmin(true);
     } else {
-      setError("❌ Incorrect password");
+      setIsAdmin(false);
     }
-  };
+    setCheckingAuth(false);
+  }, []);
 
   const handleImport = async () => {
     setImporting(true);
@@ -90,50 +91,57 @@ export default function ImportPage() {
     }
   };
 
-  if (!isAuthenticated) {
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">🔒 Admin Access Required</h1>
-          <form onSubmit={handlePasswordSubmit}>
-            <label className="block mb-2 font-semibold text-gray-700">Enter Password:</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              className="w-full px-4 py-3 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              autoFocus
-            />
-            <button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
-            >
-              Access Import Page
-            </button>
-          </form>
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800 text-sm">{error}</p>
-            </div>
-          )}
-          <div className="mt-6 text-center">
-            <a href="/" className="text-blue-600 hover:text-blue-800 underline text-sm">
-              ← Back to Home
-            </a>
-          </div>
+        <div className="max-w-md w-full bg-red-50 border border-red-200 rounded-xl p-8 text-center">
+          <h1 className="text-2xl font-bold text-red-900 mb-4">🚫 Admin Access Required</h1>
+          <p className="text-red-800 mb-6">
+            Only administrators can access this page.
+          </p>
+          <a
+            href="/"
+            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+          >
+            ← Go Home
+          </a>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full bg-white rounded-xl shadow-lg p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Import Inventory Data</h1>
-        <p className="text-gray-600 mb-6">
-          Upload Excel file and import Material, Actual Count, and Location data.
-        </p>
+    <div className="min-h-screen bg-white p-4">
+      <div className="max-w-2xl mx-auto">
+        {/* Admin Navigation */}
+        <div className="flex gap-2 mb-6">
+          <a href="/" className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-semibold">
+            ← Home
+          </a>
+          <a href="/view" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold">
+            📊 View Records
+          </a>
+          <a href="/manage" className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold">
+            🗂️ Manage
+          </a>
+          <a href="/admin" className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-semibold">
+            👥 Users
+          </a>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Import Inventory Data</h1>
+          <p className="text-gray-600 mb-6">
+            Upload Excel file and import Material, Actual Count, and Location data.
+          </p>
 
         {/* Upload Instructions */}
         <div className="mb-6 p-6 bg-amber-50 rounded-lg border border-amber-200">
@@ -225,6 +233,7 @@ export default function ImportPage() {
               {exportMessage}
             </p>
           )}
+        </div>
         </div>
       </div>
     </div>

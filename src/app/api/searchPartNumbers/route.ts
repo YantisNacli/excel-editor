@@ -15,17 +15,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
-    if (query.length < 2) {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
       return NextResponse.json({ matches: [] });
     }
 
-    const queryLower = query.toLowerCase();
+    const queryLower = trimmed.toLowerCase();
 
     // Query inventory table for matching materials
     const { data, error } = await supabase
       .from("inventory")
       .select("material")
-      .ilike("material", `${query}%`)
+      // Substring match so "20" returns 120/201 but not 210 (no contiguous "20")
+      .ilike("material", `%${trimmed}%`)
       .order("material")
       .limit(10);
 
@@ -39,13 +41,15 @@ export async function POST(req: NextRequest) {
 
     const matches = data ? data.map(item => item.material) : [];
 
-    // Sort matches: exact matches first, then alphabetically
+    // Sort matches: earliest position of query first, then shorter strings, then alphabetically
     matches.sort((a, b) => {
       const aLower = a.toLowerCase();
       const bLower = b.toLowerCase();
-      
-      if (aLower === queryLower && bLower !== queryLower) return -1;
-      if (aLower !== queryLower && bLower === queryLower) return 1;
+      const aIdx = aLower.indexOf(queryLower);
+      const bIdx = bLower.indexOf(queryLower);
+
+      if (aIdx !== bIdx) return aIdx - bIdx;
+      if (aLower.length !== bLower.length) return aLower.length - bLower.length;
       return a.localeCompare(b);
     });
 

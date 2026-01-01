@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import bcrypt from "bcryptjs";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -30,13 +31,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Insert new user
+    // Hash the default password "changeme123"
+    const defaultPassword = await bcrypt.hash("changeme123", 10);
+
+    // Insert new user with default password
     const { data, error } = await supabase
       .from("users")
       .insert([{
         email: email.trim().toLowerCase(),
         name: name.trim(),
-        role: role
+        role: role,
+        password: defaultPassword,
+        must_change_password: true
       }])
       .select()
       .single();

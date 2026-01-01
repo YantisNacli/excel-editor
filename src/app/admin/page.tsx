@@ -194,24 +194,28 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-white p-4">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-4">
-            <a
-              href="/view"
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-semibold"
-            >
-              ← Back to View
-            </a>
-            <h1 className="text-2xl font-bold text-gray-900">👥 User Management</h1>
-          </div>
+        <div className="flex gap-2 mb-6">
+          <a href="/" className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-semibold">
+            ← Home
+          </a>
+          <a href="/view" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold">
+            📊 View Records
+          </a>
+          <a href="/import" className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 font-semibold">
+            📤 Import
+          </a>
+          <a href="/manage" className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold">
+            🗂️ Manage
+          </a>
           <button
             onClick={fetchUsers}
             disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold disabled:bg-gray-400"
+            className="ml-auto px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-semibold disabled:bg-gray-400"
           >
             {loading ? "Loading..." : "Refresh"}
           </button>
         </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">👥 User Management</h1>
 
         {message && (
           <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
@@ -269,7 +273,6 @@ export default function AdminPage() {
                     onChange={(e) => setNewRole(e.target.value)}
                     className="w-full px-3 py-2 border rounded"
                   >
-                    <option value="viewer">Viewer</option>
                     <option value="operator">Operator</option>
                     <option value="admin">Admin</option>
                   </select>
@@ -286,7 +289,6 @@ export default function AdminPage() {
           )}
 
           <div className="mb-4 flex gap-2 text-xs">
-            <span className="px-2 py-1 bg-gray-200 text-gray-800 rounded font-semibold">VIEWER = Read-only</span>
             <span className="px-2 py-1 bg-blue-200 text-blue-800 rounded font-semibold">OPERATOR = Transactions</span>
             <span className="px-2 py-1 bg-purple-200 text-purple-800 rounded font-semibold">ADMIN = Full Access</span>
           </div>
@@ -324,7 +326,6 @@ export default function AdminPage() {
                       onChange={(e) => handleUpdateRole(user.email, e.target.value)}
                       className="px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="viewer">Viewer</option>
                       <option value="operator">Operator</option>
                       <option value="admin">Admin</option>
                     </select>
@@ -345,9 +346,8 @@ export default function AdminPage() {
         <div className="mt-6 p-6 bg-blue-50 border border-blue-200 rounded-lg">
           <h3 className="font-semibold text-blue-900 mb-3">ℹ️ User Role Permissions:</h3>
           <ul className="list-disc list-inside text-blue-800 space-y-2 text-sm">
-            <li><strong>Viewer:</strong> Can only view records and inventory. Cannot perform transactions.</li>
-            <li><strong>Operator:</strong> Can perform stock transactions (add/remove items) and view records.</li>
-            <li><strong>Admin:</strong> Full access including user management, inventory management, imports, and all operator functions.</li>
+            <li><strong>Operator:</strong> Can perform stock transactions (add/remove items) on the home page.</li>
+            <li><strong>Admin:</strong> Full access including /view, /import, /manage, /admin pages, user management, and all operator functions.</li>
           </ul>
           <p className="mt-4 text-xs text-blue-700">
             ⚠️ Only users with whitelisted emails can access the system. Use the "Add User" button to authorize new users.
