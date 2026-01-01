@@ -18,3 +18,9 @@
   from = "/api/*"
   to = "/.netlify/functions/next_api_:splat"
   status = 200
+
+# Explicit mapping for app router API route naming (common on Netlify)
+[[redirects]]
+  from = "/api/login"
+  to   = "/.netlify/functions/app_api_login"
+  status = 200
