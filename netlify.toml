@@ -5,9 +5,3 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
-
-# Route all /api/* requests to their corresponding Netlify functions
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
