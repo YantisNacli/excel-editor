@@ -1,12 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enable serverless functions for Netlify
-  experimental: {
-    serverActions: {
-      allowedOrigins: ["*"],
-    },
-  },
+  // Use default settings; Netlify plugin handles functions
 };
 
 export default nextConfig;

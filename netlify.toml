@@ -6,8 +6,9 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Explicitly route Next.js API endpoints to the generated functions
-[[redirects]]
-  from = "/api/*"
-  to   = "/.netlify/functions/next_api_:splat"
-  status = 200
+# Force webpack (disable Turbopack) so Netlify can generate API functions
+[context.production.environment]
+  NEXT_DISABLE_TURBOPACK = "1"
+
+[context.deploy-preview.environment]
+  NEXT_DISABLE_TURBOPACK = "1"
