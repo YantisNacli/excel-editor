@@ -7,11 +7,14 @@ const getSupabase = () => createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-key"
 );
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
+const getResend = () => new Resend(
+  process.env.RESEND_API_KEY || "placeholder-key"
+);
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = getSupabase();
+    const resend = getResend();
     const { email } = await req.json();
 
     if (!email || typeof email !== "string") {
