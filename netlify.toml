@@ -5,3 +5,9 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Explicitly route Next.js API endpoints to the generated functions
+[[redirects]]
+  from = "/api/*"
+  to   = "/.netlify/functions/next_api_:splat"
+  status = 200
