@@ -5,3 +5,10 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Rewrite /api/* to Next.js internal handler (not a redirect)
+[[redirects]]
+  from = "/api/*"
+  to = "/api/:splat"
+  status = 200
+  force = true
