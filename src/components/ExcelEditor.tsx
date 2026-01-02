@@ -1176,7 +1176,20 @@ export default function ExcelEditor() {
     return (
       <div className="p-4">
         <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
-          <h2 className="text-xl font-bold mb-4">Current Stock</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Current Stock</h2>
+            <button
+              onClick={() => {
+                setIsPartNumberSubmitted(false);
+                setPartNumber("");
+                setActualCount("");
+                setNewQuantity("");
+              }}
+              className="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+            >
+              ← Back
+            </button>
+          </div>
           <p className="mb-4 text-sm text-gray-900">
             Part: <span className="font-semibold">{partNumber}</span>
           </p>
