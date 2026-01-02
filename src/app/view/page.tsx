@@ -195,7 +195,7 @@ export default function ViewPage() {
             >
               ← Back
             </a>
-            <h1 className="text-2xl font-bold">Stock Tracker</h1>
+            <h1 className="text-2xl font-bold">Stock Log</h1>
           </div>
           <div className="flex gap-2">
             <a
