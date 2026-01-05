@@ -445,6 +445,15 @@ export default function ExcelEditor() {
       return;
     }
 
+    // Check if deducting more than available
+    const currentCount = parseInt(actualCount) || 0;
+    const quantityChange = parseInt(trimmed);
+    
+    if (quantityChange < 0 && Math.abs(quantityChange) > currentCount) {
+      alert(`Cannot remove ${Math.abs(quantityChange)} items. Only ${currentCount} items in inventory.`);
+      return;
+    }
+
     setIsSavingQuantity(true);
     try {
       // Save to database with the name, part number, and quantity
@@ -661,6 +670,15 @@ export default function ExcelEditor() {
         alert("Part number not found in inventory. Please check and try again.");
         return;
       }
+      
+      // Check if deducting more than available
+      const currentCount = parseInt(data.actualCount) || 0;
+      const quantityChange = parseInt(trimmed);
+      
+      if (quantityChange < 0 && Math.abs(quantityChange) > currentCount) {
+        alert(`Cannot remove ${Math.abs(quantityChange)} items from ${currentBatchPart}. Only ${currentCount} items in inventory.`);
+        return;
+      }
     }
 
     // Add to batch
@@ -684,6 +702,30 @@ export default function ExcelEditor() {
     if (invalidItems.length > 0) {
       alert(`Invalid quantity format for: ${invalidItems.map(item => item.partNumber).join(", ")}.\nPlease use +5 to add or -3 to remove.`);
       return;
+    }
+
+    // Validate that deductions don't exceed available inventory
+    for (const item of batchItems) {
+      const quantityChange = parseInt(item.quantity.trim());
+      
+      if (quantityChange < 0) {
+        // Get current inventory count
+        const countRes = await fetch("/api/getActualCount", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ partNumber: item.partNumber }),
+        });
+
+        if (countRes.ok) {
+          const data = await countRes.json();
+          const currentCount = parseInt(data.actualCount) || 0;
+          
+          if (Math.abs(quantityChange) > currentCount) {
+            alert(`Cannot remove ${Math.abs(quantityChange)} items from ${item.partNumber}. Only ${currentCount} items in inventory.`);
+            return;
+          }
+        }
+      }
     }
 
     setIsProcessingBatch(true);
