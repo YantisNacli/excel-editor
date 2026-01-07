@@ -180,9 +180,18 @@ export default function ComparePage() {
           const count1 = item1[countKey1] === "" || item1[countKey1] === null || item1[countKey1] === undefined ? 0 : item1[countKey1];
           const count2 = item2[countKey2] === "" || item2[countKey2] === null || item2[countKey2] === undefined ? 0 : item2[countKey2];
           
+          // Normalize locations (treat empty string, null, undefined as blank)
+          const location1 = item1[locationKey1] || "";
+          const location2 = item2[locationKey2] || "";
+          const loc1IsBlank = location1.trim() === "";
+          const loc2IsBlank = location2.trim() === "";
+          
+          // Location difference: only flag if one is blank and the other isn't
+          const locationDifferent = (loc1IsBlank !== loc2IsBlank) || (!loc1IsBlank && !loc2IsBlank && location1 !== location2);
+          
           if (
             count1 !== count2 ||
-            item1[locationKey1] !== item2[locationKey2]
+            locationDifferent
           ) {
             differences.push({
               material,
