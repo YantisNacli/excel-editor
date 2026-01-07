@@ -99,6 +99,13 @@ export default function ComparePage() {
         // Normalize blank count values to 0
         const normalizedData = data.map((item: any, index: any) => {
           const normalized = { ...item };
+          
+          // Ensure Actual Counts exists and handle blanks
+          if (!normalized['Actual Counts'] || normalized['Actual Counts'] === "" || normalized['Actual Counts'] === null || normalized['Actual Counts'] === undefined || (typeof normalized['Actual Counts'] === "string" && normalized['Actual Counts'].trim() === "")) {
+            normalized['Actual Counts'] = 0;
+          }
+          
+          // Also handle any other count-related columns
           Object.keys(normalized).forEach(key => {
             if (key.toLowerCase().includes('count') || key.toLowerCase().includes('actual')) {
               const value = normalized[key];
