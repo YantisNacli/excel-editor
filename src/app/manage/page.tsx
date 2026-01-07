@@ -10,7 +10,7 @@ type BatchItem = {
 };
 
 export default function ManagePage() {
-  const [mode, setMode] = useState<"add" | "check" | "delete">("add");
+  const [mode, setMode] = useState<"add" | "delete">("add");
   const [userRole, setUserRole] = useState<string>("");
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
@@ -20,7 +20,7 @@ export default function ManagePage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [checkBatchItems, setCheckBatchItems] = useState<Array<{ material: string; actual_count: number; location: string }>>([]);
+  const [isExporting, setIsExporting] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -59,53 +59,47 @@ export default function ManagePage() {
     setTimeout(() => setMessage(""), 2000);
   };
 
-  const handleRemoveFromBatch = (index: number) => {
-    setBatchItems(batchItems.filter((_, i) => i !== index));
-  };
-
-  const handleAddToCheckBatch = async () => {
-    if (!currentMaterial.trim()) {
-      setError("Please enter a material/part number");
-      return;
-    }
-
-    const normalizedMaterial = currentMaterial.trim().toUpperCase();
-
-    setIsProcessing(true);
+  const handleExport = async () => {
+    setIsExporting(true);
     setError("");
     setMessage("");
 
     try {
-      const res = await fetch("/api/checkInventory", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ material: normalizedMaterial }),
-      });
+      const response = await fetch("/api/exportInventory");
 
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        setError(data.error || "Part not found in inventory");
-        return;
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        
+        const contentDisposition = response.headers.get("Content-Disposition");
+        const filename = contentDisposition
+          ? contentDisposition.split("filename=")[1].replace(/"/g, "")
+          : `inventory-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        setMessage("✅ Export successful!");
+      } else {
+        const data = await response.json();
+        setError(`❌ Error: ${data.error}`);
       }
-
-      const nextItem = {
-        material: normalizedMaterial,
-        actual_count: data.actual_count ?? data.actualCount ?? 0,
-        location: data.location || "Unknown",
-      };
-
-      setCheckBatchItems([...checkBatchItems, nextItem]);
-      setCurrentMaterial("");
-      setShowSuggestions(false);
-      setMessage(`✅ Added ${normalizedMaterial} to check list`);
-      setTimeout(() => setMessage(""), 2000);
-    } catch (err) {
-      setError("❌ Failed to check part. Please try again.");
-      console.error(err);
+    } catch (error) {
+      console.error("Export error:", error);
+      setError("❌ Error: Failed to export data");
     } finally {
-      setIsProcessing(false);
+      setIsExporting(false);
     }
+  };
+
+  const handleRemoveFromBatch = (index: number) => {
+    setBatchItems(batchItems.filter((_, i) => i !== index));
   };
 
   const handleSubmitBatch = async () => {
@@ -278,7 +272,7 @@ export default function ManagePage() {
 
   const handleMaterialChange = (value: string) => {
     setCurrentMaterial(value);
-    if (mode === "check") {
+    if (mode === "add") {
       searchPartNumbers(value);
     }
   };
@@ -392,6 +386,21 @@ export default function ManagePage() {
     }
   };
 
+  const handleAddImageUpload = async (file: File | null) => {
+    if (!file) return;
+    setIsScanningImage(true);
+    setScanError("");
+    try {
+      const tokens = await scanPartNumbersFromBlob(file);
+      applyScanResults(tokens);
+    } catch (err) {
+      console.error("Upload scan error", err);
+      setScanError("Could not read that image. Try a clearer photo.");
+    } finally {
+      setIsScanningImage(false);
+    }
+  };
+
   const openScanModal = () => {
     setScanResults([]);
     setScanError("");
@@ -451,14 +460,6 @@ export default function ManagePage() {
     );
   }
 
-  const handleRemoveFromCheckBatch = (index: number) => {
-    setCheckBatchItems(checkBatchItems.filter((_, i) => i !== index));
-  };
-
-  const handleClearCheckBatch = () => {
-    setCheckBatchItems([]);
-  };
-
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -504,9 +505,13 @@ export default function ManagePage() {
           <a href="/view" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold">
             📊 View Records
           </a>
-          <a href="/import" className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 font-semibold">
-            📤 Import
-          </a>
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 font-semibold"
+          >
+            {isExporting ? "Exporting..." : "📥 Export to Excel"}
+          </button>
           <a href="/admin" className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-semibold">
             👥 Users
           </a>
@@ -523,20 +528,10 @@ export default function ManagePage() {
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
           >
-            ➕ Add New Parts
+            ➕ Add/Replace Parts
           </button>
           <button
-            onClick={() => { setMode("check"); setError(""); setMessage(""); setCheckBatchItems([]); setDeleteConfirmation(null); }}
-            className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
-              mode === "check"
-                ? "bg-green-600 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
-          >
-            🔍 Check Existing Parts
-          </button>
-          <button
-            onClick={() => { setMode("delete"); setError(""); setMessage(""); setCheckBatchItems([]); setDeleteConfirmation(null); }}
+            onClick={() => { setMode("delete"); setError(""); setMessage(""); setDeleteConfirmation(null); }}
             className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
               mode === "delete"
                 ? "bg-red-600 text-white"
@@ -550,20 +545,37 @@ export default function ManagePage() {
         {/* Add Mode */}
         {mode === "add" && (
           <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">Add New Parts to Inventory</h2>
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">Add/Replace Parts in Inventory</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Material/Part Number *
                 </label>
                 <input
                   type="text"
                   value={currentMaterial}
-                  onChange={(e) => setCurrentMaterial(e.target.value)}
+                  onChange={(e) => handleMaterialChange(e.target.value)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                   placeholder="e.g., MM01"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    {suggestions.map((suggestion, idx) => (
+                      <div
+                        key={idx}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          selectSuggestion(suggestion);
+                        }}
+                        className="px-3 py-2 hover:bg-blue-100 cursor-pointer text-gray-900"
+                      >
+                        {suggestion}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -592,6 +604,54 @@ export default function ManagePage() {
                 />
               </div>
             </div>
+
+            <div className="flex gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => { openScanModal(); startCamera(); }}
+                className="flex-1 px-3 py-2 bg-purple-600 text-white rounded-md font-semibold hover:bg-purple-700"
+              >
+                📷 Scan with Camera
+              </button>
+              <label className="flex-1">
+                <span className="block w-full px-3 py-2 bg-gray-600 text-white text-center rounded-md font-semibold hover:bg-gray-700 cursor-pointer">
+                  📸 Upload Image
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    handleAddImageUpload(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+
+            {scanResults.length > 0 && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="font-semibold text-sm text-blue-900 mb-2">Scanned part numbers (tap to use):</p>
+                <div className="flex flex-wrap gap-2">
+                  {scanResults.slice(0, 6).map((token) => (
+                    <button
+                      key={token}
+                      onClick={() => setCurrentMaterial(token)}
+                      className="px-3 py-1 bg-white border border-blue-200 rounded hover:bg-blue-100 text-sm font-semibold"
+                    >
+                      {token}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {scanError && (
+              <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded-md text-sm text-red-800">
+                {scanError}
+              </div>
+            )}
 
             <button
               onClick={handleAddToBatch}
@@ -631,147 +691,6 @@ export default function ManagePage() {
                 >
                   {isProcessing ? "Processing..." : `Submit ${batchItems.length} Items`}
                 </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Check Mode */}
-        {mode === "check" && (
-          <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">Check Existing Parts</h2>
-            
-            <div className="mb-4 relative">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Material/Part Number
-              </label>
-              <input
-                type="text"
-                value={currentMaterial}
-                onChange={(e) => handleMaterialChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && currentMaterial.trim() && !isProcessing) {
-                    handleAddToCheckBatch();
-                  }
-                }}
-                placeholder="Type to search and add to batch"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                autoFocus
-              />
-              <div className="flex gap-2 mt-3">
-                <button
-                  type="button"
-                  onClick={() => { openScanModal(); startCamera(); }}
-                  className="flex-1 px-3 py-2 bg-green-700 text-white rounded font-semibold hover:bg-green-800"
-                >
-                  Scan with Camera
-                </button>
-                <label className="flex-1">
-                  <span className="block w-full px-3 py-2 bg-gray-200 text-gray-800 text-center rounded font-semibold hover:bg-gray-300 cursor-pointer">
-                    Upload Image
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] || null;
-                      handleCheckImageUpload(file);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-              </div>
-              {scanResults.length > 0 && (
-                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
-                  <p className="font-semibold text-sm text-green-900 mb-2">Tap a scanned part number:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {scanResults.slice(0, 6).map((token) => (
-                      <button
-                        key={token}
-                        onClick={() => { setCurrentMaterial(token); setShowSuggestions(false); closeScanModal(); }}
-                        className="px-3 py-1 bg-white border border-green-200 rounded hover:bg-green-100 text-sm font-semibold"
-                      >
-                        {token}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {scanError && (
-                <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">
-                  {scanError}
-                </div>
-              )}
-              
-              {/* Autocomplete Dropdown */}
-              {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  {suggestions.map((suggestion, idx) => (
-                    <div
-                      key={idx}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        selectSuggestion(suggestion);
-                      }}
-                      className="px-3 py-2 hover:bg-blue-100 cursor-pointer text-gray-900"
-                    >
-                      {suggestion}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={handleAddToCheckBatch}
-              disabled={isProcessing || !currentMaterial.trim()}
-              className="w-full py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 font-semibold mb-6"
-            >
-              {isProcessing ? "Loading..." : "Add to Batch"}
-            </button>
-
-            {checkBatchItems.length > 0 && (
-              <div className="mt-6">
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="font-semibold text-gray-900">
-                    Parts in Batch ({checkBatchItems.length})
-                  </h3>
-                  <button
-                    onClick={handleClearCheckBatch}
-                    className="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                  >
-                    Clear All
-                  </button>
-                </div>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {checkBatchItems.map((item, idx) => (
-                    <div key={idx} className="bg-white p-4 rounded-lg border-2 border-green-500 shadow-sm">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <p className="text-lg font-bold text-gray-900">{item.material}</p>
-                        </div>
-                        <button
-                          onClick={() => handleRemoveFromCheckBatch(idx)}
-                          className="ml-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <span className="text-xs font-medium text-gray-600">Actual Count:</span>
-                          <p className="text-2xl font-bold text-blue-600">{item.actual_count}</p>
-                        </div>
-                        <div>
-                          <span className="text-xs font-medium text-gray-600">Location:</span>
-                          <p className="text-xl font-bold text-green-600">{item.location || "Not specified"}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
           </div>
