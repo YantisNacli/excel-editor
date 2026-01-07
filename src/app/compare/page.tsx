@@ -64,8 +64,38 @@ export default function ComparePage() {
     setLoading(true);
 
     setTimeout(() => {
-      const map1 = new Map(file1Data.map((item: any) => [item.Material, item]));
-      const map2 = new Map(file2Data.map((item: any) => [item.Material, item]));
+      // Debug: Check what keys are in the data
+      console.log("File 1 sample:", file1Data[0]);
+      console.log("File 2 sample:", file2Data[0]);
+      
+      // Try to find the material column name (could be "Material", "material", or other variations)
+      const getMaterialKey = (item: any) => {
+        const keys = Object.keys(item);
+        return keys.find(k => k.toLowerCase().includes('material')) || keys[0];
+      };
+      
+      const getCountKey = (item: any) => {
+        const keys = Object.keys(item);
+        return keys.find(k => k.toLowerCase().includes('count') || k.toLowerCase().includes('actual')) || keys[1];
+      };
+      
+      const getLocationKey = (item: any) => {
+        const keys = Object.keys(item);
+        return keys.find(k => k.toLowerCase().includes('location')) || keys[2];
+      };
+      
+      const materialKey1 = file1Data.length > 0 ? getMaterialKey(file1Data[0]) : 'Material';
+      const materialKey2 = file2Data.length > 0 ? getMaterialKey(file2Data[0]) : 'Material';
+      const countKey1 = file1Data.length > 0 ? getCountKey(file1Data[0]) : 'Actual Count';
+      const countKey2 = file2Data.length > 0 ? getCountKey(file2Data[0]) : 'Actual Count';
+      const locationKey1 = file1Data.length > 0 ? getLocationKey(file1Data[0]) : 'Location';
+      const locationKey2 = file2Data.length > 0 ? getLocationKey(file2Data[0]) : 'Location';
+      
+      console.log("Using keys - File 1:", { materialKey1, countKey1, locationKey1 });
+      console.log("Using keys - File 2:", { materialKey2, countKey2, locationKey2 });
+
+      const map1 = new Map(file1Data.map((item: any) => [item[materialKey1], item]));
+      const map2 = new Map(file2Data.map((item: any) => [item[materialKey2], item]));
 
       const onlyInFile1: any[] = [];
       const onlyInFile2: any[] = [];
@@ -79,14 +109,14 @@ export default function ComparePage() {
         } else {
           const item2 = map2.get(material);
           if (
-            item1["Actual Count"] !== item2["Actual Count"] ||
-            item1.Location !== item2.Location
+            item1[countKey1] !== item2[countKey2] ||
+            item1[locationKey1] !== item2[locationKey2]
           ) {
             differences.push({
               material,
               file1: item1,
               file2: item2,
-              countDiff: item2["Actual Count"] - item1["Actual Count"],
+              countDiff: item2[countKey2] - item1[countKey1],
             });
           } else {
             identical.push(item1);
