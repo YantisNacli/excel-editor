@@ -40,13 +40,20 @@ export default function ComparePage() {
       try {
         const workbook = XLSX.read(event.target?.result, { type: "binary" });
         
+        console.log(`File ${fileNum} - Available sheets:`, workbook.SheetNames);
+        
         // Look for "Master Data" sheet first, otherwise use first sheet
         let sheetName = workbook.SheetNames.find(name => 
           name.toLowerCase().includes("master") || name.toLowerCase().includes("masterdata")
         ) || workbook.SheetNames[0];
         
+        console.log(`File ${fileNum} - Using sheet: "${sheetName}"`);
+        
         const sheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json(sheet);
+        
+        console.log(`File ${fileNum} - Rows loaded:`, data.length);
+        console.log(`File ${fileNum} - First row:`, data[0]);
 
         // Normalize blank count values to 0
         const normalizedData = data.map((item: any, index: any) => {
