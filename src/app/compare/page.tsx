@@ -91,46 +91,13 @@ export default function ComparePage() {
       console.log("File 1 sample:", file1Data[0]);
       console.log("File 2 sample:", file2Data[0]);
       
-      // Try to find the material column name (could be "Material", "material", or other variations)
-      const getMaterialKey = (item: any) => {
-        const keys = Object.keys(item);
-        return keys.find(k => k.toLowerCase().includes('material')) || keys[0];
-      };
-      
-      const getCountKey = (item: any) => {
-        const keys = Object.keys(item);
-        const lowerKeys = keys.map(k => ({ original: k, lower: k.toLowerCase() }));
-        // First try exact matches
-        const exactMatch = lowerKeys.find(k => k.lower === 'actual count' || k.lower === 'actual counts' || k.lower === 'count' || k.lower === 'qty' || k.lower === 'quantity');
-        if (exactMatch) return exactMatch.original;
-        // Then try columns that START with 'actual count' or just 'count' (not buried in the name)
-        const startsWithMatch = lowerKeys.find(k => k.lower.startsWith('actual count') || k.lower.startsWith('count'));
-        if (startsWithMatch) return startsWithMatch.original;
-        // Last resort: contains 'count' but NOT 'date' and not part of another word like "account"
-        const countMatch = lowerKeys.find(k => k.lower.includes('count') && !k.lower.includes('date') && !k.lower.includes('account'));
-        return countMatch ? countMatch.original : keys[1];
-      };
-      
-      const getLocationKey = (item: any) => {
-        const keys = Object.keys(item);
-        const lowerKeys = keys.map(k => ({ original: k, lower: k.toLowerCase() }));
-        // First try exact match
-        const exactMatch = lowerKeys.find(k => k.lower === 'location' || k.lower === 'loc');
-        if (exactMatch) return exactMatch.original;
-        // Then try columns that START with 'location'
-        const startsWithMatch = lowerKeys.find(k => k.lower.startsWith('location'));
-        if (startsWithMatch) return startsWithMatch.original;
-        // Last resort: contains 'location' but not part of another word
-        const locationMatch = lowerKeys.find(k => k.lower.includes('location') && k.lower !== 'sloc');
-        return locationMatch ? locationMatch.original : keys[2];
-      };
-      
-      const materialKey1 = file1Data.length > 0 ? getMaterialKey(file1Data[0]) : 'Material';
-      const materialKey2 = file2Data.length > 0 ? getMaterialKey(file2Data[0]) : 'Material';
-      const countKey1 = file1Data.length > 0 ? getCountKey(file1Data[0]) : 'Actual Count';
-      const countKey2 = file2Data.length > 0 ? getCountKey(file2Data[0]) : 'Actual Count';
-      const locationKey1 = file1Data.length > 0 ? getLocationKey(file1Data[0]) : 'Location';
-      const locationKey2 = file2Data.length > 0 ? getLocationKey(file2Data[0]) : 'Location';
+      // Use exact column names
+      const materialKey1 = 'Material';
+      const materialKey2 = 'Material';
+      const countKey1 = 'Actual Counts';
+      const countKey2 = 'Actual Counts';
+      const locationKey1 = 'Location';
+      const locationKey2 = 'Location';
       
       // Store column keys for both files separately
       setColumnKeys({ 
