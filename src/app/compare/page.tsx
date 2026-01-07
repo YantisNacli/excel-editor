@@ -46,11 +46,17 @@ export default function ComparePage() {
         const data = XLSX.utils.sheet_to_json(sheet);
 
         // Normalize blank count values to 0
-        const normalizedData = data.map((item: any) => {
+        const normalizedData = data.map((item: any, index: any) => {
           const normalized = { ...item };
           Object.keys(normalized).forEach(key => {
             if (key.toLowerCase().includes('count') || key.toLowerCase().includes('actual')) {
-              if (normalized[key] === "" || normalized[key] === null || normalized[key] === undefined) {
+              const value = normalized[key];
+              // Log first few items to debug
+              if (index < 3) {
+                console.log(`Row ${index}, Key: ${key}, Value: "${value}", Type: ${typeof value}, Is blank: ${value === "" || value === null || value === undefined || value === " " || (typeof value === "string" && value.trim() === "")}`);
+              }
+              // Check for various blank conditions
+              if (value === "" || value === null || value === undefined || value === " " || (typeof value === "string" && value.trim() === "")) {
                 normalized[key] = 0;
               }
             }
