@@ -108,15 +108,18 @@ export default function ComparePage() {
           onlyInFile1.push(item1);
         } else {
           const item2 = map2.get(material);
+          const count1 = item1[countKey1] === "" || item1[countKey1] === null || item1[countKey1] === undefined ? 0 : item1[countKey1];
+          const count2 = item2[countKey2] === "" || item2[countKey2] === null || item2[countKey2] === undefined ? 0 : item2[countKey2];
+          
           if (
-            item1[countKey1] !== item2[countKey2] ||
+            count1 !== count2 ||
             item1[locationKey1] !== item2[locationKey2]
           ) {
             differences.push({
               material,
               file1: item1,
               file2: item2,
-              countDiff: item2[countKey2] - item1[countKey1],
+              countDiff: count2 - count1,
             });
           } else {
             identical.push(item1);
