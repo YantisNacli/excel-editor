@@ -18,7 +18,10 @@ export default function ComparePage() {
   const [file1Name, setFile1Name] = useState("");
   const [file2Name, setFile2Name] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
-  const [columnKeys, setColumnKeys] = useState({ material: 'Material', count: 'Actual Count', location: 'Location' });
+  const [columnKeys, setColumnKeys] = useState({ 
+    file1: { material: 'Material', count: 'Actual Count', location: 'Location' },
+    file2: { material: 'Material', count: 'Actual Count', location: 'Location' }
+  });
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
@@ -111,8 +114,11 @@ export default function ComparePage() {
       const locationKey1 = file1Data.length > 0 ? getLocationKey(file1Data[0]) : 'Location';
       const locationKey2 = file2Data.length > 0 ? getLocationKey(file2Data[0]) : 'Location';
       
-      // Store column keys for display
-      setColumnKeys({ material: materialKey1, count: countKey1, location: locationKey1 });
+      // Store column keys for both files separately
+      setColumnKeys({ 
+        file1: { material: materialKey1, count: countKey1, location: locationKey1 },
+        file2: { material: materialKey2, count: countKey2, location: locationKey2 }
+      });
       
       console.log("Using keys - File 1:", { materialKey1, countKey1, locationKey1 });
       console.log("Using keys - File 2:", { materialKey2, countKey2, locationKey2 });
@@ -407,9 +413,9 @@ export default function ComparePage() {
                     <tbody>
                       {comparison.onlyInFile1.map((item: any, i: number) => (
                         <tr key={i} className="hover:bg-red-50">
-                          <td className="border p-3">{item[columnKeys.material]}</td>
-                          <td className="border p-3">{item[columnKeys.count]}</td>
-                          <td className="border p-3">{item[columnKeys.location]}</td>
+                          <td className="border p-3">{item[columnKeys.file1.material]}</td>
+                          <td className="border p-3">{item[columnKeys.file1.count]}</td>
+                          <td className="border p-3">{item[columnKeys.file1.location]}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -436,9 +442,9 @@ export default function ComparePage() {
                     <tbody>
                       {comparison.onlyInFile2.map((item: any, i: number) => (
                         <tr key={i} className="hover:bg-green-50">
-                          <td className="border p-3">{item[columnKeys.material]}</td>
-                          <td className="border p-3">{item[columnKeys.count]}</td>
-                          <td className="border p-3">{item[columnKeys.location]}</td>
+                          <td className="border p-3">{item[columnKeys.file2.material]}</td>
+                          <td className="border p-3">{item[columnKeys.file2.count]}</td>
+                          <td className="border p-3">{item[columnKeys.file2.location]}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -470,10 +476,10 @@ export default function ComparePage() {
                         <tr key={i} className="hover:bg-yellow-50">
                           <td className="border p-3">{diff.material}</td>
                           <td className="border p-3">
-                            {diff.file1[columnKeys.count]}
+                            {diff.file1[columnKeys.file1.count]}
                           </td>
                           <td className="border p-3">
-                            {diff.file2[columnKeys.count]}
+                            {diff.file2[columnKeys.file2.count]}
                           </td>
                           <td
                             className={`border p-3 font-bold ${
@@ -485,8 +491,8 @@ export default function ComparePage() {
                             {diff.countDiff > 0 ? "+" : ""}
                             {diff.countDiff}
                           </td>
-                          <td className="border p-3">{diff.file1[columnKeys.location]}</td>
-                          <td className="border p-3">{diff.file2[columnKeys.location]}</td>
+                          <td className="border p-3">{diff.file1[columnKeys.file1.location]}</td>
+                          <td className="border p-3">{diff.file2[columnKeys.file2.location]}</td>
                         </tr>
                       ))}
                     </tbody>
