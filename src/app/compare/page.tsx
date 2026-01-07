@@ -54,6 +54,7 @@ export default function ComparePage() {
         // First, read as array to check for embedded headers
         const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
         console.log(`File ${fileNum} - Raw first 2 rows:`, rawData.slice(0, 2));
+        console.log(`File ${fileNum} - Raw first row detail:`, JSON.stringify(rawData[0]));
         
         // Check if first row of data contains header keywords
         let startRow = 0;
@@ -61,12 +62,14 @@ export default function ComparePage() {
           const firstRow = rawData[0];
           const hasHeaderText = firstRow.some((val: any) => 
             typeof val === 'string' && 
-            (val === 'Material' || val === 'Location' || val === 'Actual Counts' || val === 'Count' || val === 'Plnt' || val === 'SLoc')
+            (val.includes('Material') || val.includes('Location') || val.includes('Actual Counts') || val.includes('Count') || val.includes('Plnt') || val.includes('SLoc'))
           );
           
           if (hasHeaderText) {
             console.log(`File ${fileNum} - Using row 0 as headers`);
             startRow = 0;
+          } else {
+            console.log(`File ${fileNum} - No header keywords found in row 0, using default`);
           }
         }
         
