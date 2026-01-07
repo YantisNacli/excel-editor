@@ -50,24 +50,31 @@ export default function ComparePage() {
         console.log(`File ${fileNum} - Using sheet: "${sheetName}"`);
         
         const sheet = workbook.Sheets[sheetName];
-        let data = XLSX.utils.sheet_to_json(sheet);
         
-        console.log(`File ${fileNum} - Rows loaded:`, data.length);
-        console.log(`File ${fileNum} - First row:`, data[0]);
+        // First, read as array to check for embedded headers
+        const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+        console.log(`File ${fileNum} - Raw first 2 rows:`, rawData.slice(0, 2));
         
-        // Check if first row contains header text (e.g., if a column value is 'Material', 'Location', etc.)
-        if (data.length > 0 && data[0]) {
-          const firstRowValues = Object.values(data[0] as any);
-          const hasHeaderText = firstRowValues.some((val: any) => 
+        // Check if first row of data contains header keywords
+        let startRow = 0;
+        if (rawData.length > 0) {
+          const firstRow = rawData[0];
+          const hasHeaderText = firstRow.some((val: any) => 
             typeof val === 'string' && 
             (val === 'Material' || val === 'Location' || val === 'Actual Counts' || val === 'Count' || val === 'Plnt' || val === 'SLoc')
           );
           
           if (hasHeaderText) {
-            console.log(`File ${fileNum} - First row appears to be headers, skipping it`);
-            data = data.slice(1); // Skip the first row
+            console.log(`File ${fileNum} - Using row 0 as headers`);
+            startRow = 0;
           }
         }
+        
+        // Read with proper headers
+        let data = XLSX.utils.sheet_to_json(sheet, { range: startRow });
+        
+        console.log(`File ${fileNum} - Rows loaded:`, data.length);
+        console.log(`File ${fileNum} - First data row:`, data[0]);
 
         // Normalize blank count values to 0
         const normalizedData = data.map((item: any, index: any) => {
