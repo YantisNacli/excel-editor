@@ -43,6 +43,19 @@ export async function GET(req: NextRequest) {
 
     // Create workbook and worksheet
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    
+    // Add AutoFilter to enable column filtering
+    // Set the range to cover all data (from A1 to the last column and row)
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    worksheet['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+    
+    // Set column widths for better readability
+    worksheet['!cols'] = [
+      { wch: 20 }, // Material column
+      { wch: 15 }, // Actual Count column
+      { wch: 20 }  // Location column
+    ];
+    
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Master Data");
 
