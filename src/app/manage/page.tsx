@@ -505,13 +505,6 @@ export default function ManagePage() {
           <a href="/view" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold">
             📊 View Records
           </a>
-          <button
-            onClick={handleExport}
-            disabled={isExporting}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 font-semibold"
-          >
-            {isExporting ? "Exporting..." : "📥 Export to Excel"}
-          </button>
           <a href="/admin" className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-semibold">
             👥 Users
           </a>
@@ -934,6 +927,17 @@ export default function ManagePage() {
             </div>
           </div>
         )}
+
+        {/* Export Button */}
+        <div className="mt-8 pt-6 border-t border-gray-300">
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="w-full py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 font-bold text-lg"
+          >
+            {isExporting ? "Exporting..." : "📥 Export Inventory to Excel"}
+          </button>
+        </div>
       </div>
     </div>
   );
