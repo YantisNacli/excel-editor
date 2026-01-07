@@ -33,9 +33,10 @@ export async function GET(req: NextRequest) {
 
     // Create worksheet data with headers
     const worksheetData = [
-      ["Material", "Actual Count", "Location"], // Header row
+      ["Material", "Prefix", "Actual Count", "Location"], // Header row
       ...data.map(item => [
         item.material,
+        item.material ? item.material.substring(0, 2).toUpperCase() : "", // First 2 characters
         item.actual_count,
         item.location || ""
       ])
@@ -52,6 +53,7 @@ export async function GET(req: NextRequest) {
     // Set column widths for better readability
     worksheet['!cols'] = [
       { wch: 20 }, // Material column
+      { wch: 10 }, // Prefix column
       { wch: 15 }, // Actual Count column
       { wch: 20 }  // Location column
     ];
