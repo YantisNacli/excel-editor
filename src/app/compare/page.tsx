@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 
 type ComparisonResult = {
@@ -19,10 +19,10 @@ export default function ComparePage() {
   const [file2Name, setFile2Name] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
 
-  useState(() => {
+  useEffect(() => {
     const userRole = localStorage.getItem('stockTrackerUserRole');
     setIsAdmin(userRole === 'admin');
-  });
+  }, []);
 
   const handleFileUpload = async (e: any, fileNum: number) => {
     const file = e.target.files?.[0];
