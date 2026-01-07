@@ -249,14 +249,6 @@ export default function ComparePage() {
                 <p className="mt-2 text-sm text-green-600">
                   ✓ {file1Name} ({file1Data.length} items)
                 </p>
-            
-            <button
-              onClick={handleExportInventory}
-              disabled={isExporting}
-              className="ml-auto bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition flex items-center gap-2"
-            >
-              {isExporting ? "⏳ Exporting..." : "📥 Export Current Inventory"}
-            </button>
               )}
             </div>
             <div>
@@ -294,6 +286,14 @@ export default function ComparePage() {
                 📥 Export Comparison
               </button>
             )}
+            
+            <button
+              onClick={handleExportInventory}
+              disabled={isExporting}
+              className="ml-auto bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition flex items-center gap-2"
+            >
+              {isExporting ? "⏳ Exporting..." : "📥 Export Current Inventory"}
+            </button>
           </div>
         </div>
 
