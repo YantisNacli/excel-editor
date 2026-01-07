@@ -198,7 +198,7 @@ export default function ComparePage() {
               </label>
               <input
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.xlsm"
                 onChange={(e) => handleFileUpload(e, 1)}
                 className="w-full border-2 border-gray-300 p-3 rounded-lg hover:border-blue-400 focus:border-blue-500 transition"
               />
@@ -214,7 +214,7 @@ export default function ComparePage() {
               </label>
               <input
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.xlsm"
                 onChange={(e) => handleFileUpload(e, 2)}
                 className="w-full border-2 border-gray-300 p-3 rounded-lg hover:border-blue-400 focus:border-blue-500 transition"
               />
