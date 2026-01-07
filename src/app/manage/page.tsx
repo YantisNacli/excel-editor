@@ -930,17 +930,6 @@ export default function ManagePage() {
             </div>
           </div>
         )}
-
-        {/* Export Button */}
-        <div className="mt-8 pt-6 border-t border-gray-300">
-          <button
-            onClick={handleExport}
-            disabled={isExporting}
-            className="w-full py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 font-bold text-lg"
-          >
-            {isExporting ? "Exporting..." : "📥 Export Inventory to Excel"}
-          </button>
-        </div>
       </div>
     </div>
   );

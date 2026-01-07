@@ -18,6 +18,7 @@ export default function ComparePage() {
   const [file1Name, setFile1Name] = useState("");
   const [file2Name, setFile2Name] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const userRole = localStorage.getItem('stockTrackerUserRole');
@@ -159,6 +160,43 @@ export default function ComparePage() {
     );
   };
 
+  const handleExportInventory = async () => {
+    setIsExporting(true);
+
+    try {
+      const response = await fetch("/api/exportInventory");
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        
+        const contentDisposition = response.headers.get("Content-Disposition");
+        const filename = contentDisposition
+          ? contentDisposition.split("filename=")[1].replace(/"/g, "")
+          : `inventory-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        alert("✅ Export successful!");
+      } else {
+        const data = await response.json();
+        alert(`❌ Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("❌ Error: Failed to export data");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen p-4 bg-gray-50">
       <div className="max-w-7xl mx-auto">
@@ -211,6 +249,14 @@ export default function ComparePage() {
                 <p className="mt-2 text-sm text-green-600">
                   ✓ {file1Name} ({file1Data.length} items)
                 </p>
+            
+            <button
+              onClick={handleExportInventory}
+              disabled={isExporting}
+              className="ml-auto bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition flex items-center gap-2"
+            >
+              {isExporting ? "⏳ Exporting..." : "📥 Export Current Inventory"}
+            </button>
               )}
             </div>
             <div>
@@ -298,7 +344,6 @@ export default function ComparePage() {
                     <thead className="bg-red-100">
                       <tr>
                         <th className="border p-3 text-left">Material</th>
-                        <th className="border p-3 text-left">Prefix</th>
                         <th className="border p-3 text-left">Count</th>
                         <th className="border p-3 text-left">Location</th>
                       </tr>
@@ -307,7 +352,6 @@ export default function ComparePage() {
                       {comparison.onlyInFile1.map((item: any, i: number) => (
                         <tr key={i} className="hover:bg-red-50">
                           <td className="border p-3">{item.Material}</td>
-                          <td className="border p-3">{item.Prefix}</td>
                           <td className="border p-3">{item["Actual Count"]}</td>
                           <td className="border p-3">{item.Location}</td>
                         </tr>
@@ -329,7 +373,6 @@ export default function ComparePage() {
                     <thead className="bg-green-100">
                       <tr>
                         <th className="border p-3 text-left">Material</th>
-                        <th className="border p-3 text-left">Prefix</th>
                         <th className="border p-3 text-left">Count</th>
                         <th className="border p-3 text-left">Location</th>
                       </tr>
@@ -338,7 +381,6 @@ export default function ComparePage() {
                       {comparison.onlyInFile2.map((item: any, i: number) => (
                         <tr key={i} className="hover:bg-green-50">
                           <td className="border p-3">{item.Material}</td>
-                          <td className="border p-3">{item.Prefix}</td>
                           <td className="border p-3">{item["Actual Count"]}</td>
                           <td className="border p-3">{item.Location}</td>
                         </tr>
