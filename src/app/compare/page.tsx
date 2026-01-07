@@ -50,10 +50,24 @@ export default function ComparePage() {
         console.log(`File ${fileNum} - Using sheet: "${sheetName}"`);
         
         const sheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(sheet);
+        let data = XLSX.utils.sheet_to_json(sheet);
         
         console.log(`File ${fileNum} - Rows loaded:`, data.length);
         console.log(`File ${fileNum} - First row:`, data[0]);
+        
+        // Check if first row contains header text (e.g., if a column value is 'Material', 'Location', etc.)
+        if (data.length > 0 && data[0]) {
+          const firstRowValues = Object.values(data[0] as any);
+          const hasHeaderText = firstRowValues.some((val: any) => 
+            typeof val === 'string' && 
+            (val === 'Material' || val === 'Location' || val === 'Actual Counts' || val === 'Count' || val === 'Plnt' || val === 'SLoc')
+          );
+          
+          if (hasHeaderText) {
+            console.log(`File ${fileNum} - First row appears to be headers, skipping it`);
+            data = data.slice(1); // Skip the first row
+          }
+        }
 
         // Normalize blank count values to 0
         const normalizedData = data.map((item: any, index: any) => {
