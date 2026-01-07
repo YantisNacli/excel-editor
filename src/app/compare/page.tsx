@@ -34,7 +34,12 @@ export default function ComparePage() {
     reader.onload = (event) => {
       try {
         const workbook = XLSX.read(event.target?.result, { type: "binary" });
-        const sheetName = workbook.SheetNames[0];
+        
+        // Look for "Master Data" sheet first, otherwise use first sheet
+        let sheetName = workbook.SheetNames.find(name => 
+          name.toLowerCase().includes("master") || name.toLowerCase().includes("masterdata")
+        ) || workbook.SheetNames[0];
+        
         const sheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json(sheet);
 
