@@ -44,11 +44,24 @@ export default function ComparePage() {
         const sheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json(sheet);
 
+        // Normalize blank count values to 0
+        const normalizedData = data.map((item: any) => {
+          const normalized = { ...item };
+          Object.keys(normalized).forEach(key => {
+            if (key.toLowerCase().includes('count') || key.toLowerCase().includes('actual')) {
+              if (normalized[key] === "" || normalized[key] === null || normalized[key] === undefined) {
+                normalized[key] = 0;
+              }
+            }
+          });
+          return normalized;
+        });
+
         if (fileNum === 1) {
-          setFile1Data(data);
+          setFile1Data(normalizedData);
           setFile1Name(file.name);
         } else {
-          setFile2Data(data);
+          setFile2Data(normalizedData);
           setFile2Name(file.name);
         }
       } catch (error) {
