@@ -78,6 +78,23 @@ export default function ComparePage() {
         
         console.log(`File ${fileNum} - Rows loaded:`, data.length);
         console.log(`File ${fileNum} - First data row:`, data[0]);
+        
+        // Check if the first data row actually contains header text as values
+        if (data.length > 0 && data[0]) {
+          const firstRowValues = Object.values(data[0] as any);
+          const hasHeaderAsValue = firstRowValues.some((val: any) => 
+            typeof val === 'string' && 
+            (val === 'Material' || val === 'Location' || val === 'Actual Counts' || val === 'Plnt' || val === 'SLoc')
+          );
+          
+          if (hasHeaderAsValue) {
+            console.log(`File ${fileNum} - First data row contains headers, re-reading from row 1`);
+            // The actual headers are in what we thought was the first data row
+            data = XLSX.utils.sheet_to_json(sheet, { range: startRow + 1 });
+            console.log(`File ${fileNum} - After correction - Rows loaded:`, data.length);
+            console.log(`File ${fileNum} - After correction - First data row:`, data[0]);
+          }
+        }
 
         // Normalize blank count values to 0
         const normalizedData = data.map((item: any, index: any) => {
