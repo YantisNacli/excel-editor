@@ -99,7 +99,13 @@ export default function ComparePage() {
       
       const getCountKey = (item: any) => {
         const keys = Object.keys(item);
-        return keys.find(k => k.toLowerCase().includes('count') || k.toLowerCase().includes('actual')) || keys[1];
+        const lowerKeys = keys.map(k => ({ original: k, lower: k.toLowerCase() }));
+        // First try exact matches
+        const exactMatch = lowerKeys.find(k => k.lower === 'actual count' || k.lower === 'count' || k.lower === 'qty' || k.lower === 'quantity');
+        if (exactMatch) return exactMatch.original;
+        // Then try to find one that contains 'count' or 'actual' but NOT 'date'
+        const countMatch = lowerKeys.find(k => (k.lower.includes('count') || k.lower.includes('actual')) && !k.lower.includes('date'));
+        return countMatch ? countMatch.original : keys[1];
       };
       
       const getLocationKey = (item: any) => {
