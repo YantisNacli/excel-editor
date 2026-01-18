@@ -13,8 +13,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Evident Stock Tracker",
+  title: "WABTEC STOCK TRACKER",
   description: "Inventory management and stock tracking system",
+  icons: {
+    icon: [
+      {
+        url: '/icon.png',
+        type: 'image/png',
+      }
+    ],
+    apple: [
+      {
+        url: '/icon.png',
+        type: 'image/png',
+      }
+    ],
+  },
 };
 
 export default function RootLayout({
