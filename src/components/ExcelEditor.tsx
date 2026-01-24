@@ -1232,7 +1232,7 @@ export default function ExcelEditor() {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">Part Number</h2>
             <div className="flex gap-2">
-              {userRole === "admin" && (
+              {(userRole === "admin" || userRole === "viewer") && (
                 <a
                   href="/view"
                   className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold"
@@ -1381,7 +1381,7 @@ export default function ExcelEditor() {
         <div className="flex items-center justify-center min-h-screen">
           <div className="max-w-2xl w-full p-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl shadow-2xl">
             <h2 className="text-3xl font-bold text-white text-center mb-6">
-              {location.includes("\n") ? "Locations" : "Location"}
+              {location.includes("\n") ? "Locations" : (userRole === "viewer" ? "Stock Information" : "Location")}
             </h2>
             <div className="bg-white rounded-xl p-8">
               {location.includes("\n") ? (
@@ -1393,10 +1393,29 @@ export default function ExcelEditor() {
                   ))}
                 </div>
               ) : (
-                <p className="text-6xl font-black text-gray-900 break-words text-center">{location}</p>
+                <>
+                  {userRole === "viewer" ? (
+                    <div className="space-y-6">
+                      <div className="text-center">
+                        <p className="text-gray-600 text-lg mb-2">Part Number</p>
+                        <p className="text-3xl font-black text-gray-900 break-words">{partNumber}</p>
+                      </div>
+                      <div className="border-t-2 border-gray-200 pt-6">
+                        <p className="text-gray-600 text-lg mb-2 text-center">Current Stock</p>
+                        <p className="text-5xl font-black text-blue-600 text-center">{actualCount}</p>
+                      </div>
+                      <div className="border-t-2 border-gray-200 pt-6">
+                        <p className="text-gray-600 text-lg mb-2 text-center">Location</p>
+                        <p className="text-5xl font-black text-gray-900 text-center break-words">{location}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-6xl font-black text-gray-900 break-words text-center">{location}</p>
+                  )}
+                </>
               )}
             </div>
-            {!location.includes("\n") && partNumber && (
+            {!location.includes("\n") && partNumber && userRole !== "viewer" && (
               <p className="text-white text-center mt-6 text-lg">Part: {partNumber}</p>
             )}
             <div className="flex gap-3 mt-6">
