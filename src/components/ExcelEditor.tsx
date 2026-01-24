@@ -422,6 +422,26 @@ export default function ExcelEditor() {
         
         setActualCount(data.actualCount);
         setIsPartNumberSubmitted(true);
+
+        // For Viewer role, skip quantity question and go directly to showing location
+        if (userRole === "viewer") {
+          // Get location immediately
+          const locRes = await fetch("/api/getLocation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ partNumber }),
+          });
+
+          if (locRes.ok) {
+            const locData = await locRes.json();
+            setLocation(locData.location);
+            setIsQuantitySubmitted(true);
+          } else {
+            setLocation("Unable to fetch location");
+            setIsQuantitySubmitted(true);
+          }
+          // Note: Viewers don't record their searches in the database
+        }
       } else {
         alert("Unable to fetch count. Please try again.");
       }
@@ -647,6 +667,33 @@ export default function ExcelEditor() {
   }
 
   const handleAddToBatch = async () => {
+    // For Viewer role, only part number is required
+    if (userRole === "viewer") {
+      if (!currentBatchPart.trim()) return;
+
+      // Validate part number exists
+      const countRes = await fetch("/api/getActualCount", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partNumber: currentBatchPart }),
+      });
+
+      if (countRes.ok) {
+        const data = await countRes.json();
+        if (data.actualCount === "Part number not found in inventory") {
+          alert("Part number not found in inventory. Please check and try again.");
+          return;
+        }
+      }
+
+      // Add to batch with empty quantity for viewer
+      setBatchItems([...batchItems, { partNumber: currentBatchPart, quantity: "" }]);
+      setCurrentBatchPart("");
+      setShowSuggestions(false);
+      return;
+    }
+
+    // For non-viewer roles (admin/operator)
     if (!currentBatchPart.trim() || !currentBatchQty.trim()) return;
 
     // Validate quantity format
@@ -695,6 +742,61 @@ export default function ExcelEditor() {
   const handleSubmitBatch = async () => {
     if (batchItems.length === 0) return;
 
+    // For Viewer role, just fetch and display information
+    if (userRole === "viewer") {
+      setIsProcessingBatch(true);
+      try {
+        const results: Array<{partNumber: string, actualCount: string, location: string}> = [];
+
+        // Get count and location for each item
+        for (const item of batchItems) {
+          // Get actual count
+          const countRes = await fetch("/api/getActualCount", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ partNumber: item.partNumber }),
+          });
+
+          let actualCount = "Unknown";
+          if (countRes.ok) {
+            const data = await countRes.json();
+            actualCount = data.actualCount;
+          }
+
+          // Get location
+          const locRes = await fetch("/api/getLocation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ partNumber: item.partNumber }),
+          });
+
+          let locationStr = "Unknown";
+          if (locRes.ok) {
+            const data = await locRes.json();
+            locationStr = data.location;
+          }
+
+          results.push({ partNumber: item.partNumber, actualCount, location: locationStr });
+        }
+
+        // Clear batch items and show results
+        setBatchItems([]);
+        setIsPartNumberSubmitted(true);
+        setIsQuantitySubmitted(true);
+        
+        // Create summary display: partNumber:quantity:location
+        const locationSummary = results.map(r => `${r.partNumber}: ${r.actualCount}: ${r.location}`).join("\n");
+        setLocation(locationSummary);
+      } catch (error) {
+        console.error("Error processing batch:", error);
+        alert("Error processing batch");
+      } finally {
+        setIsProcessingBatch(false);
+      }
+      return;
+    }
+
+    // For non-viewer roles (admin/operator)
     // Validate all quantities before submitting
     const regex = /^[+-]\d+$/;
     const invalidItems = batchItems.filter(item => !regex.test(item.quantity.trim()));
@@ -896,17 +998,19 @@ export default function ExcelEditor() {
                   {batchItems.map((item, index) => (
                     <div key={index} className="flex gap-2 items-center p-2 bg-gray-50 rounded">
                       <span className="text-sm font-medium flex-shrink-0 w-32">{item.partNumber}</span>
-                      <input
-                        type="text"
-                        value={item.quantity}
-                        onChange={(e) => {
-                          const newItems = [...batchItems];
-                          newItems[index].quantity = e.target.value;
-                          setBatchItems(newItems);
-                        }}
-                        placeholder="+5 or -3"
-                        className="flex-1 px-2 py-1 text-sm border rounded"
-                      />
+                      {userRole !== "viewer" && (
+                        <input
+                          type="text"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const newItems = [...batchItems];
+                            newItems[index].quantity = e.target.value;
+                            setBatchItems(newItems);
+                          }}
+                          placeholder="+5 or -3"
+                          className="flex-1 px-2 py-1 text-sm border rounded"
+                        />
+                      )}
                       <button
                         onClick={() => handleRemoveFromBatch(index)}
                         className="text-red-500 hover:text-red-700 text-sm font-semibold flex-shrink-0"
@@ -1001,23 +1105,27 @@ export default function ExcelEditor() {
                 </div>
               )}
 
-              <label className="block mb-2 font-semibold">Quantity (+/-)</label>
-              <input
-                type="text"
-                value={currentBatchQty}
-                onChange={(e) => setCurrentBatchQty(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleAddToBatch();
-                  }
-                }}
-                placeholder="+5 or -3"
-                className="w-full px-3 py-2 border rounded mb-3"
-              />
+              {userRole !== "viewer" && (
+                <>
+                  <label className="block mb-2 font-semibold">Quantity (+/-)</label>
+                  <input
+                    type="text"
+                    value={currentBatchQty}
+                    onChange={(e) => setCurrentBatchQty(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleAddToBatch();
+                      }
+                    }}
+                    placeholder="+5 or -3"
+                    className="w-full px-3 py-2 border rounded mb-3"
+                  />
+                </>
+              )}
 
               <button
                 onClick={handleAddToBatch}
-                disabled={!currentBatchPart.trim() || !currentBatchQty.trim()}
+                disabled={userRole === "viewer" ? !currentBatchPart.trim() : (!currentBatchPart.trim() || !currentBatchQty.trim())}
                 className="w-full px-3 py-2 bg-green-500 text-white rounded font-semibold disabled:bg-gray-400"
               >
                 Add to List
@@ -1306,7 +1414,7 @@ export default function ExcelEditor() {
               >
                 🏠 Home
               </button>
-              {userRole === "admin" && (
+              {(userRole === "admin" || userRole === "viewer") && (
                 <a
                   href="/view"
                   className="flex-1 px-6 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors text-center"

@@ -20,20 +20,22 @@ export default function ViewPage() {
   const [filterColumn, setFilterColumn] = useState<"all" | "name" | "partNumber" | "quantity">("all");
   const [dateFilter, setDateFilter] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isViewer, setIsViewer] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [deleteAllPassword, setDeleteAllPassword] = useState("");
   const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   useEffect(() => {
-    // Check if user is admin
+    // Check if user is admin or viewer
     const userRole = localStorage.getItem('stockTrackerUserRole');
     
     if (userRole === 'admin') {
       setIsAdmin(true);
       fetchData();
-    } else {
-      setIsAdmin(false);
+    } else if (userRole === 'viewer') {
+      setIsViewer(true);
+      fetchData();
     }
     setCheckingAuth(false);
   }, []);
@@ -165,13 +167,13 @@ export default function ViewPage() {
     );
   }
 
-  if (!isAdmin) {
+  if (!isAdmin && !isViewer) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-red-50 border border-red-200 rounded-xl p-8 text-center">
-          <h1 className="text-2xl font-bold text-red-900 mb-4">🚫 Admin Access Required</h1>
+          <h1 className="text-2xl font-bold text-red-900 mb-4">🚫 Access Denied</h1>
           <p className="text-red-800 mb-6">
-            Only administrators can access this page.
+            You do not have permission to access this page.
           </p>
           <a
             href="/"
@@ -204,24 +206,28 @@ export default function ViewPage() {
             >
               📊 Compare
             </a>
-            <a
-              href="/manage"
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold"
-            >
-              🗂️ Manage
-            </a>
-            <a
-              href="/admin"
-              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-semibold"
-            >
-              👥 Users
-            </a>
-            <button
-              onClick={() => setShowDeleteAllModal(true)}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold"
-            >
-              🗑️ Delete All
-            </button>
+            {isAdmin && (
+              <>
+                <a
+                  href="/manage"
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold"
+                >
+                  🗂️ Manage
+                </a>
+                <a
+                  href="/admin"
+                  className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-semibold"
+                >
+                  👥 Users
+                </a>
+                <button
+                  onClick={() => setShowDeleteAllModal(true)}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold"
+                >
+                  🗑️ Delete All
+                </button>
+              </>
+            )}
             <button
               onClick={fetchData}
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -307,13 +313,13 @@ export default function ViewPage() {
                   <th className="px-4 py-2 border-b text-left">Name</th>
                   <th className="px-4 py-2 border-b text-left">Part Number</th>
                   <th className="px-4 py-2 border-b text-left">Quantity</th>
-                  <th className="px-4 py-2 border-b text-left">Actions</th>
+                  {isAdmin && <th className="px-4 py-2 border-b text-left">Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-2 text-center text-gray-700">
+                    <td colSpan={isAdmin ? 6 : 5} className="px-4 py-2 text-center text-gray-700">
                       {data.length === 0 ? "No data yet" : "No records match your filters"}
                     </td>
                   </tr>
@@ -325,14 +331,16 @@ export default function ViewPage() {
                       <td className="px-4 py-2 border-b text-gray-900">{row.name}</td>
                       <td className="px-4 py-2 border-b text-gray-900">{row.partNumber}</td>
                       <td className="px-4 py-2 border-b text-gray-900">{row.quantity}</td>
-                      <td className="px-4 py-2 border-b">
-                        <button
-                          onClick={() => handleDelete(row.id)}
-                          className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-                        >
-                          Delete
-                        </button>
-                      </td>
+                      {isAdmin && (
+                        <td className="px-4 py-2 border-b">
+                          <button
+                            onClick={() => handleDelete(row.id)}
+                            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
