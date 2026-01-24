@@ -1323,6 +1323,20 @@ export default function ExcelEditor() {
   }
 
   if (!isQuantitySubmitted) {
+    // Viewers skip this screen - show loading instead
+    if (userRole === "viewer") {
+      return (
+        <div className="p-4">
+          <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
+            <div className="text-center">
+              <h2 className="text-xl font-bold mb-4">Loading...</h2>
+              <p className="text-gray-600">Fetching stock information...</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="p-4">
         <div className="max-w-md mx-auto mt-12 border rounded-lg p-6 bg-gray-50">
