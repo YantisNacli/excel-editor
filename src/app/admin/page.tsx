@@ -273,6 +273,7 @@ export default function AdminPage() {
                     onChange={(e) => setNewRole(e.target.value)}
                     className="w-full px-3 py-2 border rounded"
                   >
+                    <option value="viewer">Viewer</option>
                     <option value="operator">Operator</option>
                     <option value="admin">Admin</option>
                   </select>
@@ -289,6 +290,7 @@ export default function AdminPage() {
           )}
 
           <div className="mb-4 flex gap-2 text-xs">
+            <span className="px-2 py-1 bg-green-200 text-green-800 rounded font-semibold">VIEWER = Read-Only</span>
             <span className="px-2 py-1 bg-blue-200 text-blue-800 rounded font-semibold">OPERATOR = Transactions</span>
             <span className="px-2 py-1 bg-purple-200 text-purple-800 rounded font-semibold">ADMIN = Full Access</span>
           </div>
@@ -310,6 +312,7 @@ export default function AdminPage() {
                       <span className={`px-2 py-1 text-xs font-semibold rounded ${
                         user.role === "admin" ? "bg-purple-200 text-purple-800" :
                         user.role === "operator" ? "bg-blue-200 text-blue-800" :
+                        user.role === "viewer" ? "bg-green-200 text-green-800" :
                         "bg-gray-200 text-gray-800"
                       }`}>
                         {user.role.toUpperCase()}
@@ -326,6 +329,7 @@ export default function AdminPage() {
                       onChange={(e) => handleUpdateRole(user.email, e.target.value)}
                       className="px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
+                      <option value="viewer">Viewer</option>
                       <option value="operator">Operator</option>
                       <option value="admin">Admin</option>
                     </select>
@@ -346,6 +350,7 @@ export default function AdminPage() {
         <div className="mt-6 p-6 bg-blue-50 border border-blue-200 rounded-lg">
           <h3 className="font-semibold text-blue-900 mb-3">ℹ️ User Role Permissions:</h3>
           <ul className="list-disc list-inside text-blue-800 space-y-2 text-sm">
+            <li><strong>Viewer:</strong> Read-only access to check stock quantities and locations. Can view /view and /compare pages but cannot modify data.</li>
             <li><strong>Operator:</strong> Can perform stock transactions (add/remove items) on the home page.</li>
             <li><strong>Admin:</strong> Full access including /view, /import, /manage, /admin pages, user management, and all operator functions.</li>
           </ul>
